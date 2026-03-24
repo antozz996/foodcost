@@ -37,7 +37,14 @@ const authMiddleware = async (req, res, next) => {
     if (!token) return res.status(401).json({ error: 'Auth token missing' });
 
     const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) return res.status(401).json({ error: 'Invalid token' });
+    if (error || !user) {
+        console.error("Auth Middleware Error:", error);
+        return res.status(401).json({ 
+            error: 'Invalid token', 
+            details: error?.message || 'User non trovato',
+            hint: 'Controlla le variabili d\'ambiente SUPABASE_URL e SUPABASE_SERVICE_KEY su Railway' 
+        });
+    }
 
     req.user = user;
     next();
