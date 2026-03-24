@@ -1,0 +1,4 @@
+node_modules/
+.env
+foodcost.db
+frontend/dist/
