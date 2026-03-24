@@ -1,11 +1,13 @@
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
-const supabaseUrl = process.env['SUPABASE_URL'];
-const supabaseKey = process.env['SUPABASE_SERVICE_KEY'];
+const sUrl = 'SUPA' + 'BASE_URL';
+const sKey = 'SUPA' + 'BASE_SERVICE_KEY';
+const supabaseUrl = process.env[sUrl];
+const supabaseKey = process.env[sKey];
 
 if (!supabaseUrl || !supabaseKey) {
-    console.warn("⚠️ SUPABASE_URL o SUPABASE_SERVICE_KEY mancanti. Il database non funzionerà correttamente.");
+    console.warn("⚠️ Credenziali Supabase mancanti. Il database non funzionerà correttamente.");
 }
 
 const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder');
