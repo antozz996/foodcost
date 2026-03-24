@@ -132,7 +132,7 @@ export async function renderIngredients(container) {
                     alert(`✅ Importati ${parsedIngredients.length} ingredienti con successo!`);
                     renderIngredients(container);
                 } catch (err) {
-                    alert('❌ Errore durante l\\'importazione: ' + err.message);
+                    alert("❌ Errore durante l'importazione: " + err.message);
                 } finally {
                     btnImportHover.innerHTML = '<span class="icon">📁</span> Importa CSV';
                 }
