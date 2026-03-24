@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { escapeHTML } from './utils.js';
 
 export async function renderMenus(container) {
     const menus = await api.get('/menu');
@@ -15,7 +16,7 @@ export async function renderMenus(container) {
             ${menus.map(m => `
                 <div class="card relative">
                     <button class="btn-danger btn-delete" data-id="${m.id}" style="position:absolute; top: 16px; right: 16px; padding: 4px 8px; border:none; border-radius:4px; cursor:pointer;">&times;</button>
-                    <h3>${m.nome}</h3>
+                    <h3>${escapeHTML(m.nome)}</h3>
                     <div class="grid grid-cols-2 mt-4" style="gap:12px;">
                         <div>
                             <div class="text-muted" style="font-size: 13px;">Prezzo Vendita</div>
@@ -68,7 +69,7 @@ export async function renderMenus(container) {
                             ${allRecipes.map(r => `
                                 <label class="flex items-center gap-4 cursor-pointer">
                                     <input type="checkbox" value="${r.id}" class="menu-recipe-cb" style="width: 16px; height: 16px;">
-                                    <span>${r.nome} <small class="text-muted">(Costo: €${r.costo_porzione.toFixed(2)})</small></span>
+                                    <span>${escapeHTML(r.nome)} <small class="text-muted">(Costo: €${r.costo_porzione.toFixed(2)})</small></span>
                                 </label>
                             `).join('')}
                             ${allRecipes.length === 0 ? '<div class="text-muted text-sm text-center">Nessuna ricetta disponibile. Creane prima una.</div>' : ''}

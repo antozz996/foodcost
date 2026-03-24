@@ -1,11 +1,32 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const supabase = require('./supabase');
 
 const app = express();
-app.use(cors());
+
+// Security Headers
+app.use(helmet({
+    contentSecurityPolicy: false // Disabilitato per l'MVP per evitare blocchi su script inline di Vite
+}));
+
+// CORS Firewall
+app.use(cors({
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
+
+// Rate Limiting contro attacchi DoS/Brute Force
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, 
+    max: 200, 
+    message: { error: 'Troppe richieste dal tuo IP, riprova più tardi.' }
+});
+app.use('/api/', apiLimiter);
 
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
@@ -31,8 +52,12 @@ app.get('/api/ingredienti', authMiddleware, async (req, res) => {
 
 app.post('/api/ingredienti', authMiddleware, async (req, res) => {
     const { nome, unita, prezzo_attuale, scarto } = req.body;
-    const data_aggiornamento = new Date().toISOString().split('T')[0];
     
+    // Business Logic Validation
+    if (prezzo_attuale < 0) return res.status(400).json({ error: "Il prezzo non può essere negativo." });
+    if (scarto < 0 || scarto > 99) return res.status(400).json({ error: "Lo scarto deve essere tra 0 e 99." });
+
+    const data_aggiornamento = new Date().toISOString().split('T')[0];
     const { data, error } = await supabase.from('ingredienti').insert([
         { user_id: req.user.id, nome, unita, prezzo_attuale, scarto: scarto || 0, data_aggiornamento }
     ]).select();
@@ -43,8 +68,12 @@ app.post('/api/ingredienti', authMiddleware, async (req, res) => {
 
 app.put('/api/ingredienti/:id', authMiddleware, async (req, res) => {
     const { prezzo_attuale, scarto } = req.body;
+
+    // Business Logic Validation
+    if (prezzo_attuale < 0) return res.status(400).json({ error: "Il prezzo non può essere negativo." });
+    if (scarto < 0 || scarto > 99) return res.status(400).json({ error: "Lo scarto deve essere tra 0 e 99." });
+
     const data_aggiornamento = new Date().toISOString().split('T')[0];
-    
     const { data, error } = await supabase.from('ingredienti')
         .update({ prezzo_attuale, scarto: scarto || 0, data_aggiornamento })
         .eq('id', req.params.id)
@@ -95,6 +124,10 @@ app.get('/api/ricette', authMiddleware, async (req, res) => {
 
 app.post('/api/ricette', authMiddleware, async (req, res) => {
     const { nome, porzioni, ingredienti } = req.body;
+
+    // Business Logic Validation
+    if (porzioni < 1) return res.status(400).json({ error: "Le porzioni non possono essere inferiori a 1." });
+
     const { data: ricetta, error } = await supabase.from('ricette').insert([
         { user_id: req.user.id, nome, porzioni: porzioni || 1 }
     ]).select();
@@ -191,6 +224,11 @@ app.get('/api/menu', authMiddleware, async (req, res) => {
 
 app.post('/api/menu', authMiddleware, async (req, res) => {
     const { nome, prezzo_vendita, iva, ricette } = req.body;
+
+    // Business Logic Validation
+    if (prezzo_vendita < 0) return res.status(400).json({ error: "Il prezzo non può essere negativo." });
+    if (iva < 0 || iva > 100) return res.status(400).json({ error: "IVA non valida." });
+
     const { data: menu, error } = await supabase.from('menu').insert([
         { user_id: req.user.id, nome, prezzo_vendita, iva: iva || 10 }
     ]).select();

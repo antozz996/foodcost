@@ -1,6 +1,5 @@
 import { api } from './api.js';
-
-export async function renderIngredients(container) {
+import { escapeHTML } from './utils.js';export async function renderIngredients(container) {
     const ingredients = await api.get('/ingredienti');
 
     container.innerHTML = `
@@ -26,8 +25,8 @@ export async function renderIngredients(container) {
                     <tbody>
                         ${ingredients.map(i => `
                             <tr>
-                                <td>${i.nome}</td>
-                                <td>${i.unita}</td>
+                                <td>${escapeHTML(i.nome)}</td>
+                                <td>${escapeHTML(i.unita)}</td>
                                 <td>€<input type="number" step="0.01" value="${i.prezzo_attuale}" class="form-control" style="width:80px; display:inline-block; padding:4px 8px;" id="price-${i.id}"></td>
                                 <td><input type="number" step="1" value="${i.scarto || 0}" class="form-control" style="width:70px; display:inline-block; padding:4px 8px;" id="waste-${i.id}">%</td>
                                 <td class="text-muted">${i.data_aggiornamento}</td>

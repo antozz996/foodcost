@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { escapeHTML } from './utils.js';
 
 export async function renderRecipes(container) {
     const recipes = await api.get('/ricette');
@@ -26,7 +27,7 @@ export async function renderRecipes(container) {
                     <tbody>
                         ${recipes.map(r => `
                             <tr>
-                                <td><strong>${r.nome}</strong></td>
+                                <td><strong>${escapeHTML(r.nome)}</strong></td>
                                 <td>${r.porzioni}</td>
                                 <td>€${r.costo_totale.toFixed(2)}</td>
                                 <td class="text-success font-medium">€${r.costo_porzione.toFixed(2)}</td>
@@ -67,7 +68,7 @@ export async function renderRecipes(container) {
                         <div class="flex gap-4">
                             <select id="ingredient-select" class="form-control" style="flex: 2;">
                                 <option value="" disabled selected>Scegli ingrediente...</option>
-                                ${allIngredients.map(i => `<option value="${i.id}" data-unit="${i.unita}"> ${i.nome} (€${i.prezzo_attuale}/${i.unita}) </option>`).join('')}
+                                ${allIngredients.map(i => `<option value="${i.id}" data-unit="${escapeHTML(i.unita)}"> ${escapeHTML(i.nome)} (€${i.prezzo_attuale}/${escapeHTML(i.unita)}) </option>`).join('')}
                             </select>
                             <input type="number" id="ingredient-qty" class="form-control" placeholder="Quantità" step="0.01" style="flex: 1;">
                             <span id="ingredient-unit-label" style="align-self: center; width: 40px;" class="text-muted"></span>
@@ -89,7 +90,7 @@ export async function renderRecipes(container) {
         const listDiv = document.getElementById('ingredients-list');
         listDiv.innerHTML = currentIngredients.map((item, idx) => `
             <div class="flex justify-between items-center bg-dark p-2 rounded mb-2" style="background: rgba(255,255,255,0.05); padding: 8px; border-radius: 4px;">
-                <span>${item.nome} - ${item.quantita} ${item.unita}</span>
+                <span>${escapeHTML(item.nome)} - ${item.quantita} ${escapeHTML(item.unita)}</span>
                 <button type="button" class="btn-danger btn-remove-ing" data-idx="${idx}" style="padding: 2px 8px; border:none; border-radius:4px;">&times;</button>
             </div>
         `).join('');
