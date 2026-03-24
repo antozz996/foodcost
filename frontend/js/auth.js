@@ -1,9 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+    const error = "❌ Errore di Configurazione: Le chiavi Supabase non sono state caricate correttamente durante la compilazione. Assicurati di aver salvato le spunte in Railway e attendi il nuovo deploy.";
+    console.error(error);
+    // Non blocchiamo del tutto l'init ma lo rendiamo evidente in console
+}
+
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder');
 
 export async function renderAuth(container, onSuccess) {
     container.innerHTML = `
