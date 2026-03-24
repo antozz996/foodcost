@@ -296,7 +296,7 @@ console.log("SUPABASE_URL definita:", !!process.env['SUPABASE_URL']);
 console.log("SUPABASE_SERVICE_KEY definita:", !!process.env['SUPABASE_SERVICE_KEY']);
 console.log("PORT:", PORT);
 
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
