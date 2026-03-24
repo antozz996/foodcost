@@ -66,6 +66,29 @@ app.post('/api/ingredienti', authMiddleware, async (req, res) => {
     res.json({ id: data[0].id });
 });
 
+app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
+    const { ingredienti } = req.body;
+    if (!ingredienti || !Array.isArray(ingredienti)) return res.status(400).json({ error: "Formato non valido" });
+
+    const data_aggiornamento = new Date().toISOString().split('T')[0];
+    const inserts = ingredienti.map(i => {
+        const prezzo = parseFloat(i.prezzo_attuale);
+        const scarto = parseFloat(i.scarto);
+        return {
+            user_id: req.user.id,
+            nome: i.nome || 'Sconosciuto',
+            unita: i.unita || 'pz',
+            prezzo_attuale: isNaN(prezzo) || prezzo < 0 ? 0 : prezzo,
+            scarto: isNaN(scarto) || scarto < 0 || scarto > 99 ? 0 : scarto,
+            data_aggiornamento
+        };
+    });
+
+    const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ count: data.length });
+});
+
 app.put('/api/ingredienti/:id', authMiddleware, async (req, res) => {
     const { prezzo_attuale, scarto } = req.body;
 

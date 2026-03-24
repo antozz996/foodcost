@@ -66,10 +66,12 @@ export async function renderRecipes(container) {
                         <label>Ingredienti</label>
                         <div id="ingredients-list" class="mb-4"></div>
                         <div class="flex gap-4">
-                            <select id="ingredient-select" class="form-control" style="flex: 2;">
-                                <option value="" disabled selected>Scegli ingrediente...</option>
-                                ${allIngredients.map(i => `<option value="${i.id}" data-unit="${escapeHTML(i.unita)}"> ${escapeHTML(i.nome)} (€${i.prezzo_attuale}/${escapeHTML(i.unita)}) </option>`).join('')}
-                            </select>
+                            <div style="flex: 2; display: flex; flex-direction: column;">
+                                <input type="text" id="ingredient-search" list="ingredients-datalist" class="form-control" placeholder="Cerca Ingrediente..." autocomplete="off">
+                                <datalist id="ingredients-datalist">
+                                    ${allIngredients.map(i => `<option data-id="${i.id}" data-unit="${escapeHTML(i.unita)}" value="${escapeHTML(i.nome)} (€${i.prezzo_attuale}/${escapeHTML(i.unita)})"></option>`).join('')}
+                                </datalist>
+                            </div>
                             <input type="number" id="ingredient-qty" class="form-control" placeholder="Quantità" step="0.01" style="flex: 1;">
                             <span id="ingredient-unit-label" style="align-self: center; width: 40px;" class="text-muted"></span>
                             <button type="button" id="btn-add-ingredient-to-list" class="btn btn-secondary">Aggiungi</button>
@@ -103,23 +105,41 @@ export async function renderRecipes(container) {
         });
     };
 
-    document.getElementById('ingredient-select').addEventListener('change', (e) => {
-        const option = e.target.options[e.target.selectedIndex];
-        document.getElementById('ingredient-unit-label').textContent = option.dataset.unit;
+    document.getElementById('ingredient-search').addEventListener('input', (e) => {
+        const selectedValue = e.target.value;
+        const option = Array.from(document.querySelectorAll('#ingredients-datalist option')).find(opt => opt.value === selectedValue);
+        if (option) {
+            document.getElementById('ingredient-unit-label').textContent = option.dataset.unit;
+        } else {
+            document.getElementById('ingredient-unit-label').textContent = '';
+        }
     });
 
     document.getElementById('btn-add-ingredient-to-list').addEventListener('click', () => {
-        const select = document.getElementById('ingredient-select');
+        const searchInput = document.getElementById('ingredient-search');
         const qtyInput = document.getElementById('ingredient-qty');
-        const id = select.value;
-        const nome = select.options[select.selectedIndex].text.split(' (')[0];
-        const unita = select.options[select.selectedIndex].dataset.unit;
+        
+        const selectedValue = searchInput.value;
+        const option = Array.from(document.querySelectorAll('#ingredients-datalist option')).find(opt => opt.value === selectedValue);
+        
+        if (!option) {
+            alert('Seleziona un ingrediente valido dalla lista!');
+            return;
+        }
+
+        const id = option.dataset.id;
+        const nome = selectedValue.split(' (')[0];
+        const unita = option.dataset.unit;
         const quantita = parseFloat(qtyInput.value);
 
         if (id && quantita > 0) {
             currentIngredients.push({ ingrediente_id: id, nome, unita, quantita });
+            searchInput.value = '';
             qtyInput.value = '';
+            document.getElementById('ingredient-unit-label').textContent = '';
             updateIngredientsList();
+        } else {
+            alert('Inserisci una quantità valida (maggiore di zero).');
         }
     });
 

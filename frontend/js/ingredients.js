@@ -1,13 +1,21 @@
 import { api } from './api.js';
-import { escapeHTML } from './utils.js';export async function renderIngredients(container) {
+import { escapeHTML } from './utils.js';
+
+export async function renderIngredients(container) {
     const ingredients = await api.get('/ingredienti');
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6">
             <h2>Gestione Ingredienti</h2>
-            <button class="btn" id="btn-add-ingredient">
-                <span class="icon">+</span> Nuovo Ingrediente
-            </button>
+            <div class="flex gap-4">
+                <button class="btn btn-secondary" id="btn-import-csv">
+                    <span class="icon">📁</span> Importa CSV
+                </button>
+                <input type="file" id="csv-file-input" accept=".csv" class="hidden">
+                <button class="btn" id="btn-add-ingredient">
+                    <span class="icon">+</span> Nuovo Ingrediente
+                </button>
+            </div>
         </div>
         <div class="card">
             <div class="table-container">
@@ -82,6 +90,63 @@ import { escapeHTML } from './utils.js';export async function renderIngredients(
         </div>
     `;
 
+    // Upload CSV logic
+    const btnImportHover = document.getElementById('btn-import-csv');
+    const fileInput = document.getElementById('csv-file-input');
+    
+    btnImportHover.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const csvText = event.target.result;
+            const lines = csvText.split('\\n').filter(line => line.trim() !== '');
+            const parsedIngredients = [];
+            
+            // Assume the first row is header, skip it. Or detect if it's header.
+            const startIndex = (lines[0].toLowerCase().includes('nome') || lines[0].toLowerCase().includes('prezzo')) ? 1 : 0;
+
+            for (let i = startIndex; i < lines.length; i++) {
+                // simple csv split by comma or semicolon
+                const separator = lines[i].includes(';') ? ';' : ',';
+                const cols = lines[i].split(separator).map(c => c.trim().replace(/^"|"$/g, ''));
+                if (cols.length >= 3) {
+                    parsedIngredients.push({
+                        nome: cols[0],
+                        unita: cols[1].toLowerCase(),
+                        prezzo_attuale: parseFloat(cols[2].replace(',', '.') || 0),
+                        scarto: parseFloat((cols[3] || '0').replace(',', '.'))
+                    });
+                }
+            }
+
+            if (parsedIngredients.length > 0) {
+                btnImportHover.textContent = 'Importazione in corso...';
+                try {
+                    await api.post('/ingredienti/batch', { ingredienti: parsedIngredients });
+                    alert(`✅ Importati ${parsedIngredients.length} ingredienti con successo!`);
+                    renderIngredients(container);
+                } catch (err) {
+                    alert('❌ Errore durante l\\'importazione: ' + err.message);
+                } finally {
+                    btnImportHover.innerHTML = '<span class="icon">📁</span> Importa CSV';
+                }
+            } else {
+                alert('Nessun ingrediente valido trovato nel file CSV. Assicurati che le colonne siano: Nome, Unità, Prezzo, Scarto (opzionale).');
+            }
+        };
+        reader.readAsText(file);
+        
+        // simple reset
+        e.target.value = '';
+    });
+
+    // Row Actions
     container.querySelectorAll('.btn-save').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const id = e.target.dataset.id;
