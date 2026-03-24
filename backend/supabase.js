@@ -10,6 +10,14 @@ if (!supabaseUrl || !supabaseKey) {
     console.warn("⚠️ Credenziali Supabase mancanti. Il database non funzionerà correttamente.");
 }
 
-const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder');
+// Aggiungiamo una sanitizzazione aggressiva in caso di copia-incolla errati da parte dell'utente in Railway
+let cleanUrl = (supabaseUrl || 'https://placeholder.supabase.co').trim().replace(/^["']|["']$/g, '');
+let cleanKey = (supabaseKey || 'placeholder').trim().replace(/^["']|["']$/g, '');
+
+if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+    cleanUrl = 'https://' + cleanUrl;
+}
+
+const supabase = createClient(cleanUrl, cleanKey);
 
 module.exports = supabase;
