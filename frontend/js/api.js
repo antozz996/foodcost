@@ -14,7 +14,12 @@ const getHeaders = async () => {
 export const api = {
     get: async (endpoint) => {
         const res = await fetch(`${API_URL}${endpoint}`, { headers: await getHeaders() });
-        if (!res.ok) throw new Error('API Error');
+        if (!res.ok) {
+            let errorData;
+            try { errorData = await res.json(); } catch(e) {}
+            const msg = errorData?.details || errorData?.error || res.statusText || 'Errore Sconosciuto';
+            throw new Error(msg);
+        }
         return res.json();
     },
     post: async (endpoint, data) => {
