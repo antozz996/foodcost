@@ -5,6 +5,7 @@ CREATE TABLE ingredienti (
     nome TEXT NOT NULL,
     unita TEXT NOT NULL,
     prezzo_attuale NUMERIC NOT NULL,
+    scarto NUMERIC NOT NULL DEFAULT 0,
     data_aggiornamento DATE NOT NULL
 );
 
@@ -26,7 +27,8 @@ CREATE TABLE menu (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     nome TEXT NOT NULL,
-    prezzo_vendita NUMERIC NOT NULL
+    prezzo_vendita NUMERIC NOT NULL,
+    iva NUMERIC NOT NULL DEFAULT 10
 );
 
 CREATE TABLE menu_ricette (

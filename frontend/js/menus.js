@@ -26,11 +26,21 @@ export async function renderMenus(container) {
                             <div class="text-xl">€${parseFloat(m.costo_menu).toFixed(2)}</div>
                         </div>
                     </div>
+                    
                     <div class="mt-4 pt-4" style="border-top: 1px solid var(--border-color)">
+                        <div class="text-muted text-sm mb-2">Margine Lordo (IVA ${m.iva}% inclusa)</div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span>Utile Lordo</span>
+                            <strong class="${m.margine_lordo_percent >= 50 ? 'text-success' : (m.margine_lordo_percent > 20 ? 'text-warning' : 'text-danger')}">
+                                €${m.margine_lordo} (${m.margine_lordo_percent}%)
+                            </strong>
+                        </div>
+                        
+                        <div class="text-muted text-sm mb-2" style="border-top: 1px dashed var(--border-color); padding-top: 8px;">Margine Netto (IVA esclusa / €${m.prezzo_netto})</div>
                         <div class="flex justify-between items-center">
-                            <span class="text-muted">Margine</span>
-                            <strong class="${m.margine_percent >= 50 ? 'text-success' : (m.margine_percent > 20 ? 'text-warning' : 'text-danger')}">
-                                €${m.margine} (${m.margine_percent}%)
+                            <span>Utile Netto Reale</span>
+                            <strong class="${m.margine_netto_percent >= 50 ? 'text-success' : (m.margine_netto_percent > 20 ? 'text-warning' : 'text-danger')}">
+                                €${m.margine_netto} (${m.margine_netto_percent}%)
                             </strong>
                         </div>
                     </div>
@@ -65,9 +75,20 @@ export async function renderMenus(container) {
                         </div>
                     </div>
 
-                    <div class="form-group mt-4">
-                        <label>Prezzo di Vendita (§)</label>
-                        <input type="number" id="menu-price" class="form-control" step="0.5" required>
+                    <div class="grid grid-cols-2 mt-4" style="gap:16px;">
+                        <div class="form-group">
+                            <label>Prezzo Vendita (€)</label>
+                            <input type="number" id="menu-price" class="form-control" step="0.5" required>
+                        </div>
+                        <div class="form-group">
+                            <label>IVA (%)</label>
+                            <select id="menu-iva" class="form-control">
+                                <option value="10">10% (Ristorazione)</option>
+                                <option value="22">22% (Bevande)</option>
+                                <option value="4">4% (Agevolata)</option>
+                                <option value="0">0% (Esenzione)</option>
+                            </select>
+                        </div>
                     </div>
                     
                     <div style="margin-top: 32px">
@@ -91,6 +112,7 @@ export async function renderMenus(container) {
         e.preventDefault();
         const nome = document.getElementById('menu-name').value;
         const prezzo = document.getElementById('menu-price').value;
+        const iva = document.getElementById('menu-iva').value;
         
         const ricetteSelezionate = Array.from(document.querySelectorAll('.menu-recipe-cb:checked')).map(cb => cb.value);
 
@@ -102,6 +124,7 @@ export async function renderMenus(container) {
         await api.post('/menu', { 
             nome, 
             prezzo_vendita: parseFloat(prezzo), 
+            iva: parseInt(iva, 10),
             ricette: ricetteSelezionate 
         });
         

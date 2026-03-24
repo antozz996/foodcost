@@ -18,6 +18,7 @@ export async function renderIngredients(container) {
                             <th>Nome</th>
                             <th>Unità di Misura</th>
                             <th>Prezzo Attuale</th>
+                            <th>Scarto %</th>
                             <th>Ultimo Aggiornamento</th>
                             <th>Azioni</th>
                         </tr>
@@ -27,7 +28,8 @@ export async function renderIngredients(container) {
                             <tr>
                                 <td>${i.nome}</td>
                                 <td>${i.unita}</td>
-                                <td>€<input type="number" step="0.01" value="${i.prezzo_attuale}" class="form-control" style="width:100px; display:inline-block; padding:4px 8px;" id="price-${i.id}"></td>
+                                <td>€<input type="number" step="0.01" value="${i.prezzo_attuale}" class="form-control" style="width:80px; display:inline-block; padding:4px 8px;" id="price-${i.id}"></td>
+                                <td><input type="number" step="1" value="${i.scarto || 0}" class="form-control" style="width:70px; display:inline-block; padding:4px 8px;" id="waste-${i.id}">%</td>
                                 <td class="text-muted">${i.data_aggiornamento}</td>
                                 <td>
                                     <button class="btn btn-secondary btn-save" data-id="${i.id}">Salva</button>
@@ -35,7 +37,7 @@ export async function renderIngredients(container) {
                                 </td>
                             </tr>
                         `).join('')}
-                        ${ingredients.length === 0 ? '<tr><td colspan="5" class="text-center text-muted">Nessun ingrediente presente.</td></tr>' : ''}
+                        ${ingredients.length === 0 ? '<tr><td colspan="6" class="text-center text-muted">Nessun ingrediente presente.</td></tr>' : ''}
                     </tbody>
                 </table>
             </div>
@@ -53,22 +55,28 @@ export async function renderIngredients(container) {
                         <label>Nome</label>
                         <input type="text" id="ing-name" class="form-control" required>
                     </div>
-                    <div class="form-group">
-                        <label>Unità di Misura</label>
-                        <select id="ing-unit" class="form-control" required>
-                            <option value="kg">Chilogrammi (kg)</option>
-                            <option value="g">Grammi (g)</option>
-                            <option value="l">Litri (l)</option>
-                            <option value="ml">Millilitri (ml)</option>
-                            <option value="pz">Pezzi (pz)</option>
-                        </select>
+                    <div class="grid grid-cols-2" style="gap: 16px;">
+                        <div class="form-group">
+                            <label>Unità di Misura</label>
+                            <select id="ing-unit" class="form-control" required>
+                                <option value="kg">Chilogrammi (kg)</option>
+                                <option value="g">Grammi (g)</option>
+                                <option value="l">Litri (l)</option>
+                                <option value="ml">Millilitri (ml)</option>
+                                <option value="pz">Pezzi (pz)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Prezzo / Unità (€)</label>
+                            <input type="number" step="0.01" id="ing-price" class="form-control" required>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Prezzo / Unità (€)</label>
-                        <input type="number" step="0.01" id="ing-price" class="form-control" required>
+                    <div class="form-group mt-4">
+                        <label>Scarto / Calo Peso (%) <small class="text-muted ml-2">Es. Buccia delle patate</small></label>
+                        <input type="number" step="1" id="ing-waste" class="form-control" value="0" min="0" max="99" required>
                     </div>
                     <div style="margin-top: 24px">
-                        <button type="submit" class="btn">Salva Ingrediente</button>
+                        <button type="submit" class="btn w-100">Salva Ingrediente</button>
                     </div>
                 </form>
             </div>
@@ -79,7 +87,11 @@ export async function renderIngredients(container) {
         btn.addEventListener('click', async (e) => {
             const id = e.target.dataset.id;
             const newPrice = document.getElementById(`price-${id}`).value;
-            await api.put(`/ingredienti/${id}`, { prezzo_attuale: parseFloat(newPrice) });
+            const newWaste = document.getElementById(`waste-${id}`).value;
+            await api.put(`/ingredienti/${id}`, { 
+                prezzo_attuale: parseFloat(newPrice),
+                scarto: parseFloat(newWaste)
+            });
             renderIngredients(container);
         });
     });
@@ -107,7 +119,15 @@ export async function renderIngredients(container) {
         const nome = document.getElementById('ing-name').value;
         const unita = document.getElementById('ing-unit').value;
         const prezzo_attuale = document.getElementById('ing-price').value;
-        await api.post('/ingredienti', { nome, unita, prezzo_attuale });
+        const scarto = document.getElementById('ing-waste').value;
+        
+        await api.post('/ingredienti', { 
+            nome, 
+            unita, 
+            prezzo_attuale: parseFloat(prezzo_attuale),
+            scarto: parseFloat(scarto)
+        });
+        
         modalAdd.classList.add('hidden');
         renderIngredients(container);
     });
