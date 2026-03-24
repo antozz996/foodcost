@@ -13,14 +13,30 @@ const getHeaders = async () => {
 
 export const api = {
     get: async (endpoint) => {
-        const res = await fetch(`${API_URL}${endpoint}`, { headers: await getHeaders() });
-        if (!res.ok) {
-            let errorData;
-            try { errorData = await res.json(); } catch(e) {}
-            const msg = errorData?.details || errorData?.error || res.statusText || 'Errore Sconosciuto';
-            throw new Error(msg);
+        console.log(`[FETCH] GET ${endpoint} initiated...`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        try {
+            const res = await fetch(`${API_URL}${endpoint}`, { 
+                headers: await getHeaders(),
+                signal: controller.signal 
+            });
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+                let errorData;
+                try { errorData = await res.json(); } catch(e) {}
+                const msg = errorData?.details || errorData?.error || res.statusText || 'Errore Sconosciuto';
+                throw new Error(msg);
+            }
+            return res.json();
+        } catch (err) {
+            clearTimeout(timeoutId);
+            const errorMsg = err.name === 'AbortError' ? 'Richiesta scaduta (Timeout 15s)' : err.message;
+            console.error(`[FETCH ERROR] GET ${endpoint}:`, errorMsg);
+            throw new Error(errorMsg);
         }
-        return res.json();
     },
     post: async (endpoint, data) => {
         const res = await fetch(`${API_URL}${endpoint}`, {

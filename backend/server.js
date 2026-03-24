@@ -33,21 +33,30 @@ app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 // Middleware per proteggere le API e recuperare lo user_id
 const authMiddleware = async (req, res, next) => {
+    console.log(`[API] ${req.method} ${req.url} - Inizio Auth...`);
     const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Auth token missing' });
-
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) {
-        console.error("Auth Middleware Error:", error);
-        return res.status(401).json({ 
-            error: 'Invalid token', 
-            details: error?.message || 'User non trovato',
-            hint: 'Controlla le variabili d\'ambiente SUPABASE_URL e SUPABASE_SERVICE_KEY su Railway' 
-        });
+    if (!token) {
+        console.log(`[API] ${req.method} ${req.url} - Token mancante`);
+        return res.status(401).json({ error: 'Auth token missing' });
     }
 
-    req.user = user;
-    next();
+    try {
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        if (error || !user) {
+            console.error(`[API] Auth Error for ${req.url}:`, error?.message || 'User non trovato');
+            return res.status(401).json({ 
+                error: 'Invalid token', 
+                details: error?.message || 'User non trovato',
+                hint: 'Controlla le variabili d\'ambiente SUPABASE_URL e SUPABASE_SERVICE_KEY su Railway' 
+            });
+        }
+        console.log(`[API] Auth Success for user: ${user.id}`);
+        req.user = user;
+        next();
+    } catch (err) {
+        console.error(`[API] CRITICAL Auth Hang/Crash for ${req.url}:`, err.message);
+        res.status(500).json({ error: "Errore interno durante l'autenticazione", details: err.message });
+    }
 };
 
 // ================= INGREDIENTI =================
