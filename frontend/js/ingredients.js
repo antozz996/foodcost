@@ -150,14 +150,25 @@ export async function renderIngredients(container) {
 
             if (parsedIngredients.length > 0) {
                 console.log('[IMPORT DEBUG] Inviando ingredienti:', parsedIngredients);
-                btnImportHover.textContent = 'Importazione in corso...';
+                btnImportHover.disabled = true;
+                
+                const chunkSize = 100;
+                let importedCount = 0;
+                const total = parsedIngredients.length;
+
                 try {
-                    await api.post('/ingredienti/batch', { ingredienti: parsedIngredients });
-                    alert(`✅ Importati ${parsedIngredients.length} ingredienti con successo!`);
+                    for (let i = 0; i < total; i += chunkSize) {
+                        const chunk = parsedIngredients.slice(i, i + chunkSize);
+                        btnImportHover.textContent = `Importando ${i + chunk.length}/${total}...`;
+                        await api.post('/ingredienti/batch', { ingredienti: chunk });
+                        importedCount += chunk.length;
+                    }
+                    alert(`✅ Importati ${importedCount} ingredienti con successo!`);
                     renderIngredients(container);
                 } catch (err) {
                     alert("❌ Errore durante l'importazione: " + err.message);
                 } finally {
+                    btnImportHover.disabled = false;
                     btnImportHover.innerHTML = '<span class="icon">📁</span> Importa CSV';
                 }
             } else {
