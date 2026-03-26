@@ -146,12 +146,57 @@ app.post('/api/ingredienti/batch', async (req, res) => {
         // Log preparatorio
         console.log(`[BATCH PROVA] Invio a: ${cleanUrl}/rest/v1/ingredienti`);
         
-        // ============================================
-        // TEST: NON EFFETTUARE LA CHIAMATA.
-        // Simuliamo un successo immediato dopo la mappatura
-        // per verificare se il crash avviene PIMA della rete o DURANTE
-        // ============================================
-        return res.json({ count: inserts.length, status: "simulated_success", inserts_sample: inserts[0] });
+        // Uso del modulo https nativo per bypassare crash di Node 22 fetch()
+        const https = require('https');
+        const url = require('url');
+        
+        const targetUrl = new url.URL(`${cleanUrl}/rest/v1/ingredienti`);
+        const postData = JSON.stringify(inserts);
+        
+        const options = {
+            hostname: targetUrl.hostname,
+            port: 443,
+            path: targetUrl.pathname,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': rawKey,
+                'Authorization': `Bearer ${rawKey}`,
+                'Prefer': 'return=representation',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        return new Promise((resolve, reject) => {
+            const reqHttps = https.request(options, (resHttps) => {
+                let chunks = '';
+                resHttps.on('data', (d) => chunks += d);
+                resHttps.on('end', () => {
+                    if (resHttps.statusCode >= 200 && resHttps.statusCode < 300) {
+                        try {
+                            const inserted = JSON.parse(chunks);
+                            res.json({ count: inserted.length || 0 });
+                        } catch(e) {
+                            res.json({ count: 1, note: 'parse-error-but-ok' });
+                        }
+                        resolve();
+                    } else {
+                        console.error('[BATCH HTTPS ERROR]', resHttps.statusCode, chunks);
+                        res.status(500).json({ error: 'Errore DB HTTPS', status: resHttps.statusCode, details: chunks });
+                        resolve();
+                    }
+                });
+            });
+
+            reqHttps.on('error', (e) => {
+                console.error('[BATCH HTTPS FATAL]', e.message);
+                res.status(500).json({ error: 'Crash di rete', details: e.message });
+                resolve();
+            });
+
+            reqHttps.write(postData);
+            reqHttps.end();
+        });
 
     } catch (err) {
         console.error('[BATCH CRASH]', err.message, err.stack);
