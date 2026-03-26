@@ -113,16 +113,30 @@ app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
         });
 
         console.log(`[BATCH IMPORT] User ${req.user.id} sta importando ${inserts.length} ingredienti.`);
-        const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
+        console.log(`[BATCH IMPORT] Dati prepared:`, JSON.stringify(inserts));
+
+        // Safety timeout per evitare 503 se Supabase si blocca
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Timeout database (10s)")), 10000)
+        );
+
+        const { data, error } = await Promise.race([
+            supabase.from('ingredienti').insert(inserts).select(),
+            timeoutPromise
+        ]);
         
         if (error) {
             console.error('[BATCH IMPORT ERROR] Supabase error:', error);
             throw error;
         }
+        console.log(`[BATCH IMPORT] Successo. Righe inserite: ${data?.length || 0}`);
         res.json({ count: data?.length || 0 });
     } catch (err) {
         console.error('[API ERROR] POST /api/ingredienti/batch:', err.message);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ 
+            error: "Errore durante il salvataggio nel database", 
+            details: err.message 
+        });
     }
 });
 
