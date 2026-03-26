@@ -93,9 +93,11 @@ app.post('/api/ingredienti', authMiddleware, async (req, res) => {
     }
 });
 
-app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
+app.post('/api/bulk-ingredients', authMiddleware, async (req, res) => {
+    console.log("[ENDPOINT HIT] /api/bulk-ingredients");
     try {
         const { ingredienti } = req.body;
+        console.log("[BATCH DEBUG] Body received:", JSON.stringify(req.body).substring(0, 500));
         if (!ingredienti || !Array.isArray(ingredienti)) return res.status(400).json({ error: "Formato non valido" });
 
         const data_aggiornamento = new Date().toISOString().split('T')[0];
@@ -416,6 +418,11 @@ app.get(/.*/, (req, res) => {
             res.status(404).send('Frontend build not found. Please run build first.');
         }
     });
+});
+
+app.use((err, req, res, next) => {
+    console.error('[GLOBAL ERROR]', err);
+    res.status(500).json({ error: 'Errore Globale Server', details: err.message });
 });
 
 app.listen(PORT, () => {

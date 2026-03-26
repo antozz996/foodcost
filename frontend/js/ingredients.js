@@ -160,7 +160,7 @@ export async function renderIngredients(container) {
                     for (let i = 0; i < total; i += chunkSize) {
                         const chunk = parsedIngredients.slice(i, i + chunkSize);
                         btnImportHover.textContent = `Importando ${i + chunk.length}/${total}...`;
-                        await api.post('/ingredienti/batch', { ingredienti: chunk });
+                        await api.post('/bulk-ingredients', { ingredienti: chunk });
                         importedCount += chunk.length;
                     }
                     alert(`✅ Importati ${importedCount} ingredienti con successo!`);
