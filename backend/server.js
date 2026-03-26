@@ -112,8 +112,13 @@ app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
             };
         });
 
+        console.log(`[BATCH IMPORT] User ${req.user.id} sta importando ${inserts.length} ingredienti.`);
         const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
-        if (error) throw error;
+        
+        if (error) {
+            console.error('[BATCH IMPORT ERROR] Supabase error:', error);
+            throw error;
+        }
         res.json({ count: data?.length || 0 });
     } catch (err) {
         console.error('[API ERROR] POST /api/ingredienti/batch:', err.message);
