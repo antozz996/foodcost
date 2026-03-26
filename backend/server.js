@@ -82,41 +82,6 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
-app.use('/api/', apiLimiter);
-
-// ================= INGREDIENTI =================
-app.get('/api/ingredienti', authMiddleware, async (req, res) => {
-    const { data, error } = await supabase.from('ingredienti').select('*').eq('user_id', req.user.id).order('nome');
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
-});
-
-app.post('/api/ingredienti', authMiddleware, async (req, res) => {
-    try {
-        const { nome, unita, prezzo_attuale, scarto } = req.body;
-        
-        // Business Logic Validation
-        if (prezzo_attuale < 0) return res.status(400).json({ error: "Il prezzo non può essere negativo." });
-        if (scarto < 0 || scarto > 99) return res.status(400).json({ error: "Lo scarto deve essere tra 0 e 99." });
-
-        const data_aggiornamento = new Date().toISOString().split('T')[0];
-        const { data, error } = await supabase.from('ingredienti').insert([
-            { user_id: req.user.id, nome, unita, prezzo_attuale, scarto: scarto || 0, data_aggiornamento }
-        ]).select();
-        
-        if (error) throw error;
-        if (!data || data.length === 0) throw new Error("Errore durante l'inserimento dell'ingrediente.");
-        
-        res.json({ id: data[0].id });
-    } catch (err) {
-        console.error('[API ERROR] POST /api/ingredienti:', err.message);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-
-
-
 app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
     console.log('[BATCH] Endpoint hit');
     try {
@@ -154,6 +119,38 @@ app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
     } catch (err) {
         console.error('[BATCH CRASH]', err.message);
         res.status(500).json({ error: 'Errore importazione', details: err.message });
+    }
+});
+
+app.use('/api/', apiLimiter);
+
+// ================= INGREDIENTI =================
+app.get('/api/ingredienti', authMiddleware, async (req, res) => {
+    const { data, error } = await supabase.from('ingredienti').select('*').eq('user_id', req.user.id).order('nome');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+});
+
+app.post('/api/ingredienti', authMiddleware, async (req, res) => {
+    try {
+        const { nome, unita, prezzo_attuale, scarto } = req.body;
+        
+        // Business Logic Validation
+        if (prezzo_attuale < 0) return res.status(400).json({ error: "Il prezzo non può essere negativo." });
+        if (scarto < 0 || scarto > 99) return res.status(400).json({ error: "Lo scarto deve essere tra 0 e 99." });
+
+        const data_aggiornamento = new Date().toISOString().split('T')[0];
+        const { data, error } = await supabase.from('ingredienti').insert([
+            { user_id: req.user.id, nome, unita, prezzo_attuale, scarto: scarto || 0, data_aggiornamento }
+        ]).select();
+        
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error("Errore durante l'inserimento dell'ingrediente.");
+        
+        res.json({ id: data[0].id });
+    } catch (err) {
+        console.error('[API ERROR] POST /api/ingredienti:', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
