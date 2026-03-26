@@ -18,6 +18,8 @@ if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
     cleanUrl = 'https://' + cleanUrl;
 }
 
+console.log("[SUPABASE] Initializing client with:", cleanUrl);
 const supabase = createClient(cleanUrl, cleanKey);
+console.log("[SUPABASE] Client initialized successfully.");
 
 module.exports = supabase;
