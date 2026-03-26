@@ -108,82 +108,46 @@ app.post('/api/ingredienti', authMiddleware, async (req, res) => {
     }
 });
 
-// app.use('/api/', apiLimiter); // DISABILITATO TEMPORANEAMENTE
+app.use('/api/', apiLimiter);
 
-app.post('/bulk-ping', (req, res) => {
-    console.log("[BULK PING HIT]");
-    res.json({ ok: true });
-});
-
-app.post('/bulk-ingredients-root', authMiddleware, async (req, res) => {
-    console.log("[ENDPOINT HIT] /bulk-ingredients-root - Manual parsing START");
-    
-    let rawBody = '';
-    req.on('data', chunk => { rawBody += chunk.toString(); });
-
-    req.on('end', async () => {
-        try {
-            const body = JSON.parse(rawBody);
-            const { ingredienti } = body;
-            const userId = req.user.id;
-            
-            if (!ingredienti || !Array.isArray(ingredienti)) {
-                return res.status(400).json({ error: "Formato non valido" });
-            }
-
-            const data_aggiornamento = new Date().toISOString().split('T')[0];
-            const inserts = ingredienti.map(i => {
-                const prezzo = parseFloat(i.prezzo_attuale);
-                return {
-                    user_id: userId,
-                    nome: i.nome || 'Sconosciuto',
-                    unita: i.unita || 'pz',
-                    prezzo_attuale: isNaN(prezzo) || prezzo < 0 ? 0 : prezzo,
-                    scarto: parseFloat(i.scarto) || 0,
-                    data_aggiornamento
-                };
-            });
-
-            console.log(`[BATCH IMPORT] RAW FETCH TEST per ${userId}...`);
-            const sUrl = process.env.SUPABASE_URL.trim().replace(/^["'=]+|["']+$/g, '');
-            const sKey = process.env.SUPABASE_SERVICE_KEY.trim().replace(/^["'=]+|["']+$/g, '');
-            
-            const rawRes = await fetch(`${sUrl}/rest/v1/ingredienti`, {
-                method: 'POST',
-                headers: {
-                    'apikey': sKey,
-                    'Authorization': `Bearer ${sKey}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=representation'
-                },
-                body: JSON.stringify([{
-                    user_id: userId,
-                    nome: 'RAW_FETCH_DEBUG',
-                    unita: 'pz',
-                    prezzo_attuale: 1,
-                    scarto: 0,
-                    data_aggiornamento: new Date().toISOString().split('T')[0]
-                }])
-            });
-
-            console.log(`[RAW DEBUG] Status: ${rawRes.status}`);
-            const rawData = await rawRes.json();
-            
-            if (!rawRes.ok) {
-                console.error('[RAW ERROR]', rawData);
-                return res.status(500).json({ error: "Errore RAW DB", details: rawData });
-            }
-            res.json({ count: 1, debug: 'Raw fetch success' });
-        } catch (err) {
-            console.error('[BULK CRASH] Error:', err.message);
-            res.status(500).json({ error: "Errore durante importazione", details: err.message });
+app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
+    console.log('[BATCH] Endpoint hit');
+    try {
+        const { ingredienti } = req.body;
+        console.log('[BATCH] Ingredienti ricevuti:', ingredienti?.length);
+        
+        if (!ingredienti || !Array.isArray(ingredienti)) {
+            return res.status(400).json({ error: "Formato non valido" });
         }
-    });
 
-    req.on('error', (err) => {
-        console.error('[BULK STREAM ERROR]', err);
-        res.status(500).json({ error: 'Stream error' });
-    });
+        const data_aggiornamento = new Date().toISOString().split('T')[0];
+        const inserts = ingredienti.map(i => {
+            const prezzo = parseFloat(i.prezzo_attuale);
+            const scarto = parseFloat(i.scarto);
+            return {
+                user_id: req.user.id,
+                nome: i.nome || 'Sconosciuto',
+                unita: i.unita || 'pz',
+                prezzo_attuale: isNaN(prezzo) || prezzo < 0 ? 0 : prezzo,
+                scarto: isNaN(scarto) || scarto < 0 || scarto > 99 ? 0 : scarto,
+                data_aggiornamento
+            };
+        });
+
+        console.log('[BATCH] Inserting', inserts.length, 'items...');
+        const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
+        
+        if (error) {
+            console.error('[BATCH ERROR]', error);
+            return res.status(500).json({ error: 'Errore database', details: error.message });
+        }
+        
+        console.log('[BATCH] Successo:', data?.length, 'righe');
+        res.json({ count: data?.length || 0 });
+    } catch (err) {
+        console.error('[BATCH CRASH]', err.message);
+        res.status(500).json({ error: 'Errore importazione', details: err.message });
+    }
 });
 
 app.put('/api/ingredienti/:id', authMiddleware, async (req, res) => {

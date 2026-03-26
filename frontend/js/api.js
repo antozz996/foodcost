@@ -51,21 +51,16 @@ export const api = {
         }
     },
     post: async (endpoint, data) => {
-        const isApi = !endpoint.startsWith('http') && !endpoint.includes('bulk-ingredients-root');
-        const url = isApi ? `${API_URL}${endpoint}` : endpoint;
-        const res = await fetch(url, {
+        api.invalidate(endpoint.split('/')[2]);
+        const res = await fetch(`${API_URL}${endpoint}`, {
             method: 'POST',
-            headers: {
-                ...(await getHeaders()),
-                'Content-Type': url.includes('bulk-ingredients-root') ? 'text/plain' : 'application/json'
-            },
+            headers: await getHeaders(),
             body: JSON.stringify(data)
         });
         if (!res.ok) {
             let errorData;
             try { errorData = await res.json(); } catch(e) {}
-            const bodyStr = errorData ? JSON.stringify(errorData) : 'NoJSON';
-            const msg = `[Status ${res.status}] ${res.statusText || 'NoText'} | Body: ${bodyStr}`;
+            const msg = errorData?.details || errorData?.error || res.statusText || 'Errore API';
             throw new Error(msg);
         }
         return res.json();
