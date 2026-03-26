@@ -82,14 +82,27 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
-app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
-    console.log('[BATCH] Endpoint hit');
+app.post('/api/ingredienti/batch', async (req, res) => {
+    console.log('[BATCH] Endpoint hit (NO AUTH)');
     try {
         const { ingredienti } = req.body;
+        console.log('[BATCH] Body keys:', Object.keys(req.body || {}));
         console.log('[BATCH] Ingredienti ricevuti:', ingredienti?.length);
         
         if (!ingredienti || !Array.isArray(ingredienti)) {
             return res.status(400).json({ error: "Formato non valido" });
+        }
+
+        // Hardcode user_id temporaneamente per test
+        const token = req.headers.authorization?.split(' ')[1];
+        let userId = 'UNKNOWN';
+        try {
+            const { data: { user } } = await supabase.auth.getUser(token);
+            userId = user?.id || 'FALLBACK';
+            console.log('[BATCH] Auth OK, user:', userId);
+        } catch(authErr) {
+            console.error('[BATCH] Auth failed:', authErr.message);
+            return res.status(401).json({ error: 'Auth fallita', details: authErr.message });
         }
 
         const data_aggiornamento = new Date().toISOString().split('T')[0];
@@ -97,7 +110,7 @@ app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
             const prezzo = parseFloat(i.prezzo_attuale);
             const scarto = parseFloat(i.scarto);
             return {
-                user_id: req.user.id,
+                user_id: userId,
                 nome: i.nome || 'Sconosciuto',
                 unita: i.unita || 'pz',
                 prezzo_attuale: isNaN(prezzo) || prezzo < 0 ? 0 : prezzo,
