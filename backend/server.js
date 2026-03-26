@@ -150,14 +150,8 @@ app.post('/bulk-ingredients-root', async (req, res) => {
                 };
             });
 
-            console.log(`[BATCH IMPORT] Inserting ${inserts.length} items`);
-            const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
-            
-            if (error) {
-                console.error('[BATCH IMPORT ERROR] Supabase error:', error);
-                return res.status(500).json({ error: error.message });
-            }
-            res.json({ count: data?.length || 0 });
+            console.log(`[BATCH IMPORT] BYPASSING INSERT for ${inserts.length} items (DEBUG)`);
+            res.json({ count: inserts.length, debug: 'Bypassed' });
         } catch (err) {
             console.error('[BULK CRASH] Manual Parse Fail:', err.message);
             res.status(500).json({ error: "Errore durante il parsing manuale", details: err.message });
