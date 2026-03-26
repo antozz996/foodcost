@@ -160,7 +160,6 @@ app.post('/bulk-ingredients-root', authMiddleware, async (req, res) => {
             res.status(500).json({ error: "Errore durante importazione", details: err.message });
         }
     });
-});
 
     req.on('error', (err) => {
         console.error('[BULK STREAM ERROR]', err);
