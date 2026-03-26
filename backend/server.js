@@ -108,18 +108,17 @@ app.post('/api/ingredienti', authMiddleware, async (req, res) => {
     }
 });
 
-app.post('/api/ping', (req, res) => {
-    console.log("[PING HIT]");
-    res.json({ ok: true, body: req.body });
+// app.use('/api/', apiLimiter); // DISABILITATO TEMPORANEAMENTE
+
+app.post('/bulk-ping', (req, res) => {
+    console.log("[BULK PING HIT]");
+    res.json({ ok: true });
 });
 
-app.post('/api/bulk-ingredients', async (req, res) => {
-    console.log("[ENDPOINT HIT] /api/bulk-ingredients (Senza Auth per debug)");
+app.post('/bulk-ingredients-root', async (req, res) => {
+    console.log("[ENDPOINT HIT] /bulk-ingredients-root");
     try {
         const { ingredienti } = req.body;
-        console.log("[BATCH DEBUG] Ingredienti count:", ingredienti?.length);
-        
-        // Se non c'è user in req (perché abbiamo tolto auth), usiamo un placeholder o falliamo se non è per test
         const userId = req.user?.id || 'TEST_USER_ID'; 
         
         if (!ingredienti || !Array.isArray(ingredienti)) return res.status(400).json({ error: "Formato non valido" });
@@ -138,7 +137,7 @@ app.post('/api/bulk-ingredients', async (req, res) => {
             };
         });
 
-        console.log(`[BATCH IMPORT] Processing ${inserts.length} items for ${userId}`);
+        console.log(`[BATCH IMPORT] Processing ${inserts.length} items`);
         console.log(`[BATCH IMPORT] Dati prepared:`, JSON.stringify(inserts));
 
         // Safety timeout per evitare 503 se Supabase si blocca

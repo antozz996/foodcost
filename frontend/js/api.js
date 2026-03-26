@@ -51,8 +51,9 @@ export const api = {
         }
     },
     post: async (endpoint, data) => {
-        api.invalidate(endpoint.split('/')[2]);
-        const res = await fetch(`${API_URL}${endpoint}`, {
+        const isApi = !endpoint.startsWith('http') && !endpoint.includes('bulk-ingredients-root');
+        const url = isApi ? `${API_URL}${endpoint}` : endpoint;
+        const res = await fetch(url, {
             method: 'POST',
             headers: await getHeaders(),
             body: JSON.stringify(data)
