@@ -143,34 +143,16 @@ app.post('/api/ingredienti/batch', async (req, res) => {
         // Assicurati che l'URL sia pulito (spessi problemi in incolla su Railway)
         let cleanUrl = rawUrl.replace(/^["'=]+|["']+$/g, '').replace(/\/$/, "");
         
-        // Log preparatorio (se muore qui, non vediamo questo log)
+        // Log preparatorio
         console.log(`[BATCH PROVA] Invio a: ${cleanUrl}/rest/v1/ingredienti`);
         
-        let dbRes;
-        try {
-            dbRes = await fetch(`${cleanUrl}/rest/v1/ingredienti`, {
-                method: 'POST',
-                headers: {
-                    'apikey': rawKey,
-                    'Authorization': `Bearer ${rawKey}`,
-                    'Content-Type': 'application/json',
-                    'Prefer': 'return=representation'
-                },
-                body: JSON.stringify(inserts)
-            });
-        } catch (fetchErr) {
-            console.error('[BATCH RAW FETCH CRASH]', fetchErr.message);
-            return res.status(500).json({ error: 'Crash Fetch Interno', details: fetchErr.toString() });
-        }
+        // ============================================
+        // TEST: NON EFFETTUARE LA CHIAMATA.
+        // Simuliamo un successo immediato dopo la mappatura
+        // per verificare se il crash avviene PIMA della rete o DURANTE
+        // ============================================
+        return res.json({ count: inserts.length, status: "simulated_success", inserts_sample: inserts[0] });
 
-        if (!dbRes.ok) {
-            const errBody = await dbRes.text();
-            console.error('[BATCH RAW ERROR]', dbRes.status, errBody);
-            return res.status(500).json({ error: 'Errore DB', status: dbRes.status, details: errBody });
-        }
-
-        const inserted = await dbRes.json();
-        res.json({ count: inserted.length || 0 });
     } catch (err) {
         console.error('[BATCH CRASH]', err.message, err.stack);
         res.status(500).json({ error: 'Crash', details: err.message });
