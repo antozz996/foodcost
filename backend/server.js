@@ -27,16 +27,15 @@ app.use(express.json({ limit: '5mb' }));
 // Rate Limiting contro attacchi DoS/Brute Force
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, 
-    max: 200, 
+    max: 500, 
     message: { error: 'Troppe richieste dal tuo IP, riprova più tardi.' }
 });
-app.use('/api/', apiLimiter);
 
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 app.use((req, res, next) => {
-    console.log(`[REQ] ${req.method} ${req.url} | Content-Type: ${req.headers['content-type']}`);
+    console.log(`[REQ] ${req.method} ${req.url} | Headers: ${JSON.stringify(req.headers)}`);
     next();
 });
 
@@ -83,6 +82,8 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
+app.use('/api/', apiLimiter);
+
 // ================= INGREDIENTI =================
 app.get('/api/ingredienti', authMiddleware, async (req, res) => {
     const { data, error } = await supabase.from('ingredienti').select('*').eq('user_id', req.user.id).order('nome');
@@ -113,7 +114,8 @@ app.post('/api/ingredienti', authMiddleware, async (req, res) => {
     }
 });
 
-app.use('/api/', apiLimiter);
+
+
 
 app.post('/api/ingredienti/batch', authMiddleware, async (req, res) => {
     console.log('[BATCH] Endpoint hit');
