@@ -82,6 +82,30 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
+app.post('/api/debug-outbound-get', async (req, res) => {
+    try {
+        const r = await fetch('https://httpbin.org/get');
+        const t = await r.text();
+        res.json({ ok: r.ok, text: t.substring(0, 100) });
+    } catch(e) {
+        res.status(500).json({ err: e.message });
+    }
+});
+
+app.post('/api/debug-outbound-post', async (req, res) => {
+    try {
+        const r = await fetch('https://httpbin.org/post', {
+            method: 'POST',
+            body: JSON.stringify({ test: 123 }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const t = await r.text();
+        res.json({ ok: r.ok, text: t.substring(0, 100) });
+    } catch(e) {
+        res.status(500).json({ err: e.message });
+    }
+});
+
 app.post('/api/ingredienti/batch', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
