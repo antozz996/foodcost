@@ -8,6 +8,9 @@ export async function renderIngredients(container) {
         <div class="flex justify-between items-center mb-6">
             <h2>Gestione Ingredienti</h2>
             <div class="flex gap-4">
+                <button class="btn btn-secondary" id="btn-download-template">
+                    <span class="icon">📥</span> Scarica Modello
+                </button>
                 <button class="btn btn-secondary" id="btn-import-csv">
                     <span class="icon">📁</span> Importa CSV
                 </button>
@@ -90,6 +93,26 @@ export async function renderIngredients(container) {
         </div>
     `;
 
+    // Download Template Logic
+    document.getElementById('btn-download-template').addEventListener('click', () => {
+        const headers = "Nome;Unita;Prezzo;Scarto\n";
+        const rows = [
+            "Farina 00;kg;1.20;0",
+            "Uova;pz;0.25;0",
+            "Patate;kg;0.80;15",
+            "Olio EVO;l;9.50;0"
+        ].join("\n");
+        const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "modello_ingredienti.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
     // Upload CSV logic
     const btnImportHover = document.getElementById('btn-import-csv');
     const fileInput = document.getElementById('csv-file-input');
@@ -105,7 +128,7 @@ export async function renderIngredients(container) {
         const reader = new FileReader();
         reader.onload = async (event) => {
             const csvText = event.target.result;
-            const lines = csvText.split('\\n').filter(line => line.trim() !== '');
+            const lines = csvText.split('\n').filter(line => line.trim() !== '');
             const parsedIngredients = [];
             
             // Assume the first row is header, skip it. Or detect if it's header.
@@ -118,8 +141,8 @@ export async function renderIngredients(container) {
                 if (cols.length >= 3) {
                     parsedIngredients.push({
                         nome: cols[0],
-                        unita: cols[1].toLowerCase(),
-                        prezzo_attuale: parseFloat(cols[2].replace(',', '.') || 0),
+                        unita: (cols[1] || 'pz').toLowerCase(),
+                        prezzo_attuale: parseFloat((cols[2] || '0').replace(',', '.') || 0),
                         scarto: parseFloat((cols[3] || '0').replace(',', '.'))
                     });
                 }
