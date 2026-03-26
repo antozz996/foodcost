@@ -144,21 +144,36 @@ app.post('/bulk-ingredients-root', authMiddleware, async (req, res) => {
                 };
             });
 
-            console.log(`[BATCH IMPORT] TEST HARDCODED INSERT per ${userId}...`);
-            const { data, error } = await supabase.from('ingredienti').insert([{
-                user_id: userId,
-                nome: 'TEST_DEBUG_123',
-                unita: 'pz',
-                prezzo_attuale: 1,
-                scarto: 0,
-                data_aggiornamento: new Date().toISOString().split('T')[0]
-            }]).select();
+            console.log(`[BATCH IMPORT] RAW FETCH TEST per ${userId}...`);
+            const sUrl = process.env.SUPABASE_URL.trim().replace(/^["'=]+|["']+$/g, '');
+            const sKey = process.env.SUPABASE_SERVICE_KEY.trim().replace(/^["'=]+|["']+$/g, '');
             
-            if (error) {
-                console.error('[BATCH IMPORT ERROR] Supabase error:', error);
-                return res.status(500).json({ error: "Errore database", details: error.message });
+            const rawRes = await fetch(`${sUrl}/rest/v1/ingredienti`, {
+                method: 'POST',
+                headers: {
+                    'apikey': sKey,
+                    'Authorization': `Bearer ${sKey}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify([{
+                    user_id: userId,
+                    nome: 'RAW_FETCH_DEBUG',
+                    unita: 'pz',
+                    prezzo_attuale: 1,
+                    scarto: 0,
+                    data_aggiornamento: new Date().toISOString().split('T')[0]
+                }])
+            });
+
+            console.log(`[RAW DEBUG] Status: ${rawRes.status}`);
+            const rawData = await rawRes.json();
+            
+            if (!rawRes.ok) {
+                console.error('[RAW ERROR]', rawData);
+                return res.status(500).json({ error: "Errore RAW DB", details: rawData });
             }
-            res.json({ count: 1, debug: 'Hardcoded success' });
+            res.json({ count: 1, debug: 'Raw fetch success' });
         } catch (err) {
             console.error('[BULK CRASH] Error:', err.message);
             res.status(500).json({ error: "Errore durante importazione", details: err.message });
