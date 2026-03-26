@@ -21,9 +21,9 @@ async function prefetchData() {
     try {
         console.log('[PREFETCH] Warm-up iniziato...');
         const { api } = await import('./js/api.js');
-        api.get('/api/ingredienti');
-        api.get('/api/ricette');
-        api.get('/api/menu');
+        api.get('/ingredienti');
+        api.get('/ricette');
+        api.get('/menu');
     } catch (e) {
         console.warn('[PREFETCH] Warm-up fallito:', e.message);
     }

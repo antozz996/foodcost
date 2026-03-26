@@ -31,6 +31,10 @@ export const api = {
             clearTimeout(timeoutId);
 
             if (!res.ok) {
+                const contentType = res.headers.get('content-type');
+                if (contentType && contentType.includes('text/html')) {
+                    throw new Error('Il server ha risposto con una pagina HTML invece di dati JSON. Possibile errore di routing (Fallback SPA).');
+                }
                 let errorData;
                 try { errorData = await res.json(); } catch(e) {}
                 const msg = errorData?.details || errorData?.error || res.statusText || 'Errore Sconosciuto';
