@@ -82,57 +82,9 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
-app.post('/api/ingredienti/batch', async (req, res) => {
-    console.log('[BATCH] Endpoint hit (NO AUTH)');
-    try {
-        const { ingredienti } = req.body;
-        console.log('[BATCH] Body keys:', Object.keys(req.body || {}));
-        console.log('[BATCH] Ingredienti ricevuti:', ingredienti?.length);
-        
-        if (!ingredienti || !Array.isArray(ingredienti)) {
-            return res.status(400).json({ error: "Formato non valido" });
-        }
-
-        // Hardcode user_id temporaneamente per test
-        const token = req.headers.authorization?.split(' ')[1];
-        let userId = 'UNKNOWN';
-        try {
-            const { data: { user } } = await supabase.auth.getUser(token);
-            userId = user?.id || 'FALLBACK';
-            console.log('[BATCH] Auth OK, user:', userId);
-        } catch(authErr) {
-            console.error('[BATCH] Auth failed:', authErr.message);
-            return res.status(401).json({ error: 'Auth fallita', details: authErr.message });
-        }
-
-        const data_aggiornamento = new Date().toISOString().split('T')[0];
-        const inserts = ingredienti.map(i => {
-            const prezzo = parseFloat(i.prezzo_attuale);
-            const scarto = parseFloat(i.scarto);
-            return {
-                user_id: userId,
-                nome: i.nome || 'Sconosciuto',
-                unita: i.unita || 'pz',
-                prezzo_attuale: isNaN(prezzo) || prezzo < 0 ? 0 : prezzo,
-                scarto: isNaN(scarto) || scarto < 0 || scarto > 99 ? 0 : scarto,
-                data_aggiornamento
-            };
-        });
-
-        console.log('[BATCH] Inserting', inserts.length, 'items...');
-        const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
-        
-        if (error) {
-            console.error('[BATCH ERROR]', error);
-            return res.status(500).json({ error: 'Errore database', details: error.message });
-        }
-        
-        console.log('[BATCH] Successo:', data?.length, 'righe');
-        res.json({ count: data?.length || 0 });
-    } catch (err) {
-        console.error('[BATCH CRASH]', err.message);
-        res.status(500).json({ error: 'Errore importazione', details: err.message });
-    }
+app.post('/api/ingredienti/batch', (req, res) => {
+    console.log('[BATCH-MINIMAL] HIT! Body:', JSON.stringify(req.body).substring(0, 100));
+    res.json({ count: 0, status: 'minimal-ok' });
 });
 
 app.use('/api/', apiLimiter);
