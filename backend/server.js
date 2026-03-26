@@ -144,17 +144,21 @@ app.post('/bulk-ingredients-root', authMiddleware, async (req, res) => {
                 };
             });
 
-            console.log(`[BATCH IMPORT] Inserting ${inserts.length} items for ${userId}`);
-            
-            // Usiamo insert normale ma con catch specifico
-            const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
+            console.log(`[BATCH IMPORT] TEST HARDCODED INSERT per ${userId}...`);
+            const { data, error } = await supabase.from('ingredienti').insert([{
+                user_id: userId,
+                nome: 'TEST_DEBUG_123',
+                unita: 'pz',
+                prezzo_attuale: 1,
+                scarto: 0,
+                data_aggiornamento: new Date().toISOString().split('T')[0]
+            }]).select();
             
             if (error) {
                 console.error('[BATCH IMPORT ERROR] Supabase error:', error);
                 return res.status(500).json({ error: "Errore database", details: error.message });
             }
-            console.log(`[BATCH IMPORT] Successo. Righe: ${data?.length}`);
-            res.json({ count: data?.length || 0 });
+            res.json({ count: 1, debug: 'Hardcoded success' });
         } catch (err) {
             console.error('[BULK CRASH] Error:', err.message);
             res.status(500).json({ error: "Errore durante importazione", details: err.message });
