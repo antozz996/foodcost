@@ -55,7 +55,10 @@ export const api = {
         const url = isApi ? `${API_URL}${endpoint}` : endpoint;
         const res = await fetch(url, {
             method: 'POST',
-            headers: await getHeaders(),
+            headers: {
+                ...(await getHeaders()),
+                'Content-Type': url.includes('bulk-ingredients-root') ? 'text/plain' : 'application/json'
+            },
             body: JSON.stringify(data)
         });
         if (!res.ok) {
