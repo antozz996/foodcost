@@ -140,62 +140,33 @@ app.post('/api/ingredienti/batch', async (req, res) => {
             };
         });
 
-        // Assicurati che l'URL sia pulito (spessi problemi in incolla su Railway)
-        let cleanUrl = rawUrl.replace(/^["'=]+|["']+$/g, '').replace(/\/$/, "");
+        const { execFile } = require('child_process');
+        const path = require('path');
+        const workerPath = path.join(__dirname, 'insert_worker.js');
         
-        // Log preparatorio
-        console.log(`[BATCH PROVA] Invio a: ${cleanUrl}/rest/v1/ingredienti`);
+        console.log('[BATCH] Spawning isolated worker per insert...');
         
-        // Uso del modulo https nativo per bypassare crash di Node 22 fetch()
-        const https = require('https');
-        const url = require('url');
-        
-        const targetUrl = new url.URL(`${cleanUrl}/rest/v1/ingredienti`);
-        const postData = JSON.stringify(inserts);
-        
-        const options = {
-            hostname: targetUrl.hostname,
-            port: 443,
-            path: targetUrl.pathname,
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': rawKey,
-                'Authorization': `Bearer ${rawKey}`,
-                'Prefer': 'return=representation',
-                'Content-Length': Buffer.byteLength(postData)
-            }
-        };
-
-        return new Promise((resolve, reject) => {
-            const reqHttps = https.request(options, (resHttps) => {
-                let chunks = '';
-                resHttps.on('data', (d) => chunks += d);
-                resHttps.on('end', () => {
-                    if (resHttps.statusCode >= 200 && resHttps.statusCode < 300) {
-                        try {
-                            const inserted = JSON.parse(chunks);
-                            res.json({ count: inserted.length || 0 });
-                        } catch(e) {
-                            res.json({ count: 1, note: 'parse-error-but-ok' });
-                        }
-                        resolve();
-                    } else {
-                        console.error('[BATCH HTTPS ERROR]', resHttps.statusCode, chunks);
-                        res.status(500).json({ error: 'Errore DB HTTPS', status: resHttps.statusCode, details: chunks });
-                        resolve();
-                    }
+        execFile('node', [workerPath, JSON.stringify(inserts)], { timeout: 10000 }, (error, stdout, stderr) => {
+            if (error) {
+                console.error('[BATCH WORKER CRASH]', error);
+                return res.status(500).json({ 
+                    error: 'Worker Crash', 
+                    signal: error.signal, 
+                    code: error.code, 
+                    message: error.message,
+                    stderr: stderr 
                 });
-            });
-
-            reqHttps.on('error', (e) => {
-                console.error('[BATCH HTTPS FATAL]', e.message);
-                res.status(500).json({ error: 'Crash di rete', details: e.message });
-                resolve();
-            });
-
-            reqHttps.write(postData);
-            reqHttps.end();
+            }
+            
+            try {
+                const result = JSON.parse(stdout);
+                if (!result.success) {
+                    return res.status(500).json({ error: 'DB Error da Worker', details: result.error, stack: result.stack });
+                }
+                res.json({ count: result.dbRes?.data?.length || inserts.length, worker: true });
+            } catch(e) {
+                res.status(500).json({ error: 'Errore parsing worker stdout', stdout });
+            }
         });
 
     } catch (err) {
