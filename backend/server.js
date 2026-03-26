@@ -35,31 +35,46 @@ app.use('/api/', apiLimiter);
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
+app.use((req, res, next) => {
+    console.log(`[REQ] ${req.method} ${req.url}`);
+    next();
+});
+
+// Debug Env endpoint
+app.get('/api/debug-env', (req, res) => {
+    res.json({ 
+        keys: Object.keys(process.env).filter(k => k.includes('SUPA')),
+        node: process.version,
+        env: process.env.NODE_ENV
+    });
+});
+
 // Middleware per proteggere le API e recuperare lo user_id
 const authMiddleware = async (req, res, next) => {
-    console.log(`[API] ${req.method} ${req.url} - Inizio Auth...`);
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-        console.log(`[API] ${req.method} ${req.url} - Token mancante`);
+    console.log(`[AUTH] ${req.method} ${req.url} - Inizio...`);
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        console.log(`[AUTH] Header mancante per ${req.url}`);
         return res.status(401).json({ error: 'Auth token missing' });
     }
-
+    const token = authHeader.split(' ')[1];
+    
     try {
+        console.log(`[AUTH] Chiamata Supabase getUser...`);
         const { data: { user }, error } = await supabase.auth.getUser(token);
         if (error || !user) {
-            console.error(`[API] Auth Error for ${req.url}:`, error?.message || 'User non trovato');
+            console.error(`[AUTH] Errore Supabase per ${req.url}:`, error?.message || 'User null');
             return res.status(401).json({ 
                 error: 'Invalid token', 
-                details: error?.message || 'User non trovato',
-                hint: 'Controlla le variabili d\'ambiente SUPABASE_URL e SUPABASE_SERVICE_KEY su Railway' 
+                details: error?.message || 'User non trovato'
             });
         }
-        console.log(`[API] Auth Success for user: ${user.id}`);
+        console.log(`[AUTH] Successo per user: ${user.id}`);
         req.user = user;
         next();
     } catch (err) {
-        console.error(`[API] CRITICAL Auth Hang/Crash for ${req.url}:`, err.message);
-        res.status(500).json({ error: "Errore interno durante l'autenticazione", details: err.message });
+        console.error(`[AUTH CRASH] ${req.url}:`, err.message);
+        res.status(500).json({ error: "Crash durante Auth", details: err.message });
     }
 };
 
