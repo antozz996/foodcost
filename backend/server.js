@@ -98,20 +98,15 @@ app.post('/api/ingredienti/batch', async (req, res) => {
             return res.status(400).json({ error: "Formato non valido" });
         }
 
-        // Crea un client Supabase fresco con URL diretto (no sanitizzazione)
-        const { createClient } = require('@supabase/supabase-js');
+        // Raw HTTP insert to bypass the Supabase client library
         const rawUrl = (process.env.SUPABASE_URL || '').trim();
         const rawKey = (process.env.SUPABASE_SERVICE_KEY || '').trim();
-        const freshClient = createClient(rawUrl, rawKey);
-
         const data_aggiornamento = new Date().toISOString().split('T')[0];
-        let inserted = 0;
-
-        // Inserisci uno alla volta per evitare crash multi-row
-        for (const i of ingredienti) {
+        
+        const inserts = ingredienti.map(i => {
             const prezzo = parseFloat(i.prezzo_attuale);
             const scarto = parseFloat(i.scarto);
-            const row = {
+            return {
                 user_id: userId,
                 nome: i.nome || 'Sconosciuto',
                 unita: i.unita || 'pz',
@@ -119,15 +114,27 @@ app.post('/api/ingredienti/batch', async (req, res) => {
                 scarto: isNaN(scarto) || scarto < 0 || scarto > 99 ? 0 : scarto,
                 data_aggiornamento
             };
-            const { error } = await freshClient.from('ingredienti').insert([row]);
-            if (error) {
-                console.error('[BATCH ROW ERROR]', error.message);
-                return res.status(500).json({ error: 'Errore DB', details: error.message });
-            }
-            inserted++;
+        });
+
+        const dbRes = await fetch(`${rawUrl}/rest/v1/ingredienti`, {
+            method: 'POST',
+            headers: {
+                'apikey': rawKey,
+                'Authorization': `Bearer ${rawKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(inserts)
+        });
+
+        if (!dbRes.ok) {
+            const errBody = await dbRes.text();
+            console.error('[BATCH RAW ERROR]', dbRes.status, errBody);
+            return res.status(500).json({ error: 'Errore DB', status: dbRes.status, details: errBody });
         }
 
-        res.json({ count: inserted });
+        const inserted = await dbRes.json();
+        res.json({ count: inserted.length || 0 });
     } catch (err) {
         console.error('[BATCH CRASH]', err.message, err.stack);
         res.status(500).json({ error: 'Crash', details: err.message });
