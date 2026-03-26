@@ -163,35 +163,44 @@ const getRealCost = (qty, price, scarto) => {
 
 // ================= RICETTE =================
 app.get('/api/ricette', authMiddleware, async (req, res) => {
-    // Single query using relational join to get ingredients directly
-    const { data: ricette, error } = await supabase
-        .from('ricette')
-        .select(`
-            *,
-            ricetta_ingredienti (
-                quantita,
-                ingredienti (prezzo_attuale, scarto)
-            )
-        `)
-        .eq('user_id', req.user.id)
-        .order('nome');
+    try {
+        // Step 1: Fetch main recipes
+        const { data: ricette, error } = await supabase
+            .from('ricette')
+            .select('*')
+            .eq('user_id', req.user.id)
+            .order('nome');
 
-    if (error) return res.status(500).json({ error: error.message });
-    if (!ricette || ricette.length === 0) return res.json([]);
+        if (error) throw error;
+        if (!ricette || ricette.length === 0) return res.json([]);
 
-    const results = ricette.map(r => {
-        const costo_totale = r.ricetta_ingredienti.reduce((sum, ri) => {
-            return sum + getRealCost(ri.quantita, ri.ingredienti?.prezzo_attuale || 0, ri.ingredienti?.scarto || 0);
-        }, 0);
-        
-        return {
-            ...r,
-            costo_totale: parseFloat(costo_totale.toFixed(2)),
-            costo_porzione: parseFloat((costo_totale / r.porzioni).toFixed(2))
-        };
-    });
+        // Step 2: Batch fetch ALL related ingredients in one go (avoids N+1 and complex deep joins)
+        const ricettaIds = ricette.map(r => r.id);
+        const { data: ricetta_ingredienti, error: err2 } = await supabase
+            .from('ricetta_ingredienti')
+            .select('ricetta_id, quantita, ingredienti(prezzo_attuale, scarto)')
+            .in('ricetta_id', ricettaIds);
+            
+        if (err2) throw err2;
 
-    res.json(results);
+        const results = ricette.map(r => {
+            const ings = (ricetta_ingredienti || []).filter(ri => ri.ricetta_id === r.id);
+            const costo_totale = ings.reduce((sum, ri) => {
+                return sum + getRealCost(ri.quantita, ri.ingredienti?.prezzo_attuale || 0, ri.ingredienti?.scarto || 0);
+            }, 0);
+            
+            return {
+                ...r,
+                costo_totale: parseFloat(costo_totale.toFixed(2)),
+                costo_porzione: parseFloat((costo_totale / r.porzioni).toFixed(2))
+            };
+        });
+
+        res.json(results);
+    } catch (err) {
+        console.error('[API ERROR] GET /api/ricette:', err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/ricette', authMiddleware, async (req, res) => {
@@ -260,61 +269,76 @@ app.delete('/api/ricette/:id', authMiddleware, async (req, res) => {
 
 // ================= MENU =================
 app.get('/api/menu', authMiddleware, async (req, res) => {
-    // Relational query: single database roundtrip for all nested data
-    const { data: results, error } = await supabase
-        .from('menu')
-        .select(`
-            *,
-            menu_ricette (
-                ricette (
-                    id, porzioni,
-                    ricetta_ingredienti (
-                        quantita,
-                        ingredienti (prezzo_attuale, scarto)
-                    )
-                )
-            )
-        `)
-        .eq('user_id', req.user.id)
-        .order('nome');
+    try {
+        // Step 1: Fetch Menus
+        const { data: menus, error } = await supabase
+            .from('menu')
+            .select('*')
+            .eq('user_id', req.user.id)
+            .order('nome');
 
-    if (error) return res.status(500).json({ error: error.message });
-    if (!results || results.length === 0) return res.json([]);
+        if (error) throw error;
+        if (!menus || menus.length === 0) return res.json([]);
 
-    const formatted = results.map(m => {
-        let costo_menu = 0;
+        const menuIds = menus.map(m => m.id);
+
+        // Step 2: Fetch Menu-Recipes mapping
+        const { data: menu_ricette, error: err2 } = await supabase
+            .from('menu_ricette')
+            .select('menu_id, ricetta_id')
+            .in('menu_id', menuIds);
         
-        // Deep calculation logic remains same but data structure is flatter
-        if (m.menu_ricette) {
-            m.menu_ricette.forEach(mr => {
-                const r = mr.ricette;
-                if (!r) return;
-                const costo_ricetta = r.ricetta_ingredienti.reduce((sum, ri) => {
-                    return sum + getRealCost(ri.quantita, ri.ingredienti?.prezzo_attuale || 0, ri.ingredienti?.scarto || 0);
-                }, 0);
-                costo_menu += costo_ricetta / r.porzioni;
-            });
+        if (err2) throw err2;
+        if (!menu_ricette || menu_ricette.length === 0) {
+            return res.json(menus.map(m => ({ ...m, costo_menu: 0, prezzo_netto: m.prezzo_vendita, margine_netto: m.prezzo_vendita, margine_netto_percent: 100 })));
         }
 
-        const net_price = m.prezzo_vendita / (1 + (m.iva || 0) / 100);
-        const margine_lordo = m.prezzo_vendita - costo_menu;
-        const margine_netto = net_price - costo_menu;
-        
-        const margine_lordo_percent = m.prezzo_vendita > 0 ? (margine_lordo / m.prezzo_vendita) * 100 : 0;
-        const margine_netto_percent = net_price > 0 ? (margine_netto / net_price) * 100 : 0;
-        
-        return {
-            ...m,
-            costo_menu: parseFloat(costo_menu.toFixed(2)),
-            prezzo_netto: parseFloat(net_price.toFixed(2)),
-            margine_lordo: parseFloat(margine_lordo.toFixed(2)),
-            margine_netto: parseFloat(margine_netto.toFixed(2)),
-            margine_lordo_percent: parseFloat(margine_lordo_percent.toFixed(2)),
-            margine_netto_percent: parseFloat(margine_netto_percent.toFixed(2))
-        };
-    });
+        // Step 3: Fetch Recipes & Ingredients in one batch (2-step vs N+1)
+        const ricettaIds = [...new Set(menu_ricette.map(mr => mr.ricetta_id))];
+        const { data: ricetta_full, error: err3 } = await supabase
+            .from('ricette')
+            .select('id, porzioni, ricetta_ingredienti(quantita, ingredienti(prezzo_attuale, scarto))')
+            .in('id', ricettaIds);
 
-    res.json(formatted);
+        if (err3) throw err3;
+
+        // Pre-calculate costs per recipe
+        const recipeCosts = {};
+        (ricetta_full || []).forEach(r => {
+            const ings = r.ricetta_ingredienti || [];
+            const costo_totale = ings.reduce((sum, ri) => {
+                return sum + getRealCost(ri.quantita, ri.ingredienti?.prezzo_attuale || 0, ri.ingredienti?.scarto || 0);
+            }, 0);
+            recipeCosts[r.id] = costo_totale / r.porzioni;
+        });
+
+        const formatted = menus.map(m => {
+            const m_ricette = menu_ricette.filter(mr => mr.menu_id === m.id);
+            const costo_menu = m_ricette.reduce((sum, mr) => sum + (recipeCosts[mr.ricetta_id] || 0), 0);
+            
+            const net_price = m.prezzo_vendita / (1 + (m.iva || 0) / 100);
+            const margine_lordo = m.prezzo_vendita - costo_menu;
+            const margine_netto = net_price - costo_menu;
+            
+            const margine_lordo_percent = m.prezzo_vendita > 0 ? (margine_lordo / m.prezzo_vendita) * 100 : 0;
+            const margine_netto_percent = net_price > 0 ? (margine_netto / net_price) * 100 : 0;
+            
+            return {
+                ...m,
+                costo_menu: parseFloat(costo_menu.toFixed(2)),
+                prezzo_netto: parseFloat(net_price.toFixed(2)),
+                margine_lordo: parseFloat(margine_lordo.toFixed(2)),
+                margine_netto: parseFloat(margine_netto.toFixed(2)),
+                margine_lordo_percent: parseFloat(margine_lordo_percent.toFixed(2)),
+                margine_netto_percent: parseFloat(margine_netto_percent.toFixed(2))
+            };
+        });
+
+        res.json(formatted);
+    } catch (err) {
+        console.error('[API ERROR] GET /api/menu:', err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/menu', authMiddleware, async (req, res) => {
