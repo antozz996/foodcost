@@ -115,23 +115,17 @@ app.post('/bulk-ping', (req, res) => {
     res.json({ ok: true });
 });
 
-app.post('/bulk-ingredients-root', async (req, res) => {
+app.post('/bulk-ingredients-root', authMiddleware, async (req, res) => {
     console.log("[ENDPOINT HIT] /bulk-ingredients-root - Manual parsing START");
     
     let rawBody = '';
-    req.on('data', chunk => {
-        rawBody += chunk.toString();
-        if (rawBody.length > 10 * 1024 * 1024) { // 10MB limit
-            console.error("[BULK ERROR] Body too large");
-        }
-    });
+    req.on('data', chunk => { rawBody += chunk.toString(); });
 
     req.on('end', async () => {
-        console.log("[BULK DEBUG] Stream END. Parsing JSON...");
         try {
             const body = JSON.parse(rawBody);
             const { ingredienti } = body;
-            const userId = 'TEST_USER_ID'; 
+            const userId = req.user.id;
             
             if (!ingredienti || !Array.isArray(ingredienti)) {
                 return res.status(400).json({ error: "Formato non valido" });
@@ -150,13 +144,23 @@ app.post('/bulk-ingredients-root', async (req, res) => {
                 };
             });
 
-            console.log(`[BATCH IMPORT] BYPASSING INSERT for ${inserts.length} items (DEBUG)`);
-            res.json({ count: inserts.length, debug: 'Bypassed' });
+            console.log(`[BATCH IMPORT] Inserting ${inserts.length} items for ${userId}`);
+            
+            // Usiamo insert normale ma con catch specifico
+            const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
+            
+            if (error) {
+                console.error('[BATCH IMPORT ERROR] Supabase error:', error);
+                return res.status(500).json({ error: "Errore database", details: error.message });
+            }
+            console.log(`[BATCH IMPORT] Successo. Righe: ${data?.length}`);
+            res.json({ count: data?.length || 0 });
         } catch (err) {
-            console.error('[BULK CRASH] Manual Parse Fail:', err.message);
-            res.status(500).json({ error: "Errore durante il parsing manuale", details: err.message });
+            console.error('[BULK CRASH] Error:', err.message);
+            res.status(500).json({ error: "Errore durante importazione", details: err.message });
         }
     });
+});
 
     req.on('error', (err) => {
         console.error('[BULK STREAM ERROR]', err);
