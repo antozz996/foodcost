@@ -36,8 +36,13 @@ app.use('/api/', apiLimiter);
 app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 app.use((req, res, next) => {
-    console.log(`[REQ] ${req.method} ${req.url}`);
+    console.log(`[REQ] ${req.method} ${req.url} | Content-Type: ${req.headers['content-type']}`);
     next();
+});
+
+app.post('/api/ghost-test', (req, res) => {
+    console.log("[GHOST HIT] Body length:", JSON.stringify(req.body).length);
+    res.json({ success: true, received: req.body });
 });
 
 // Debug Env endpoint
