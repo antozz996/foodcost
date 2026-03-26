@@ -11,8 +11,14 @@ const getHeaders = async () => {
     };
 };
 
+const cache = new Map();
+
 export const api = {
-    get: async (endpoint) => {
+    get: async (endpoint, useCache = true) => {
+        if (useCache && cache.has(endpoint)) {
+            console.log(`[CACHE HIT] GET ${endpoint}`);
+            return cache.get(endpoint);
+        }
         console.log(`[FETCH] GET ${endpoint} initiated...`);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -30,7 +36,9 @@ export const api = {
                 const msg = errorData?.details || errorData?.error || res.statusText || 'Errore Sconosciuto';
                 throw new Error(msg);
             }
-            return res.json();
+            const data = await res.json();
+            cache.set(endpoint, data);
+            return data;
         } catch (err) {
             clearTimeout(timeoutId);
             const errorMsg = err.name === 'AbortError' ? 'Richiesta scaduta (Timeout 15s)' : err.message;
@@ -39,6 +47,7 @@ export const api = {
         }
     },
     post: async (endpoint, data) => {
+        api.invalidate(endpoint.split('/')[2]); // Invalida cache per il modulo (es: ingredienti)
         const res = await fetch(`${API_URL}${endpoint}`, {
             method: 'POST',
             headers: await getHeaders(),
@@ -48,6 +57,7 @@ export const api = {
         return res.json();
     },
     put: async (endpoint, data) => {
+        api.invalidate(endpoint.split('/')[2]);
         const res = await fetch(`${API_URL}${endpoint}`, {
             method: 'PUT',
             headers: await getHeaders(),
@@ -57,11 +67,19 @@ export const api = {
         return res.json();
     },
     delete: async (endpoint) => {
+        api.invalidate(endpoint.split('/')[2]);
         const res = await fetch(`${API_URL}${endpoint}`, { 
             method: 'DELETE',
             headers: await getHeaders()
         });
         if (!res.ok) throw new Error('API Error');
         return res.json();
-    }
+    },
+    invalidate: (key) => {
+        console.log(`[CACHE] Invalida cache per: ${key}`);
+        for (const k of cache.keys()) {
+            if (k.includes(key)) cache.delete(k);
+        }
+    },
+    clearCache: () => cache.clear()
 };

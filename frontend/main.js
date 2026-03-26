@@ -17,6 +17,18 @@ const views = {
     'menus': { title: 'Menù', render: renderMenus }
 };
 
+async function prefetchData() {
+    try {
+        console.log('[PREFETCH] Warm-up iniziato...');
+        const { api } = await import('./js/api.js');
+        api.get('/api/ingredienti');
+        api.get('/api/ricette');
+        api.get('/api/menu');
+    } catch (e) {
+        console.warn('[PREFETCH] Warm-up fallito:', e.message);
+    }
+}
+
 export async function navigateTo(viewId) {
     navLinks.forEach(link => {
         if (link.dataset.view === viewId) link.classList.add('active');
@@ -26,7 +38,11 @@ export async function navigateTo(viewId) {
     const view = views[viewId];
     if (view) {
         pageTitle.textContent = view.title;
-        viewContainer.innerHTML = '<div class="text-muted">Caricamento in corso...</div>';
+        // Solo se è la prima volta o non abbiamo dati carichiamo il loader
+        if (viewContainer.innerHTML === '' || viewContainer.innerText.includes('Accedi')) {
+            viewContainer.innerHTML = '<div class="text-muted">Caricamento in corso...</div>';
+        }
+        
         try {
             await view.render(viewContainer);
         } catch (error) {
@@ -56,6 +72,7 @@ async function initApp() {
                 sidebar.style.display = 'flex';
                 topHeader.style.display = 'flex';
                 navigateTo('dashboard');
+                prefetchData();
             } else {
                 sidebar.style.display = 'none';
                 topHeader.style.display = 'none';
