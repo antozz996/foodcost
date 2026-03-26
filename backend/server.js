@@ -82,9 +82,45 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
-app.post('/api/ingredienti/batch', (req, res) => {
-    console.log('[BATCH-MINIMAL] HIT! Body:', JSON.stringify(req.body).substring(0, 100));
-    res.json({ count: 0, status: 'minimal-ok' });
+app.post('/api/ingredienti/batch', async (req, res) => {
+    try {
+        // Auth inline
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) return res.status(401).json({ error: 'Token mancante' });
+
+        const authResult = await supabase.auth.getUser(token);
+        if (authResult.error || !authResult.data?.user) {
+            return res.status(401).json({ error: 'Token non valido' });
+        }
+        const userId = authResult.data.user.id;
+
+        const { ingredienti } = req.body;
+        if (!ingredienti || !Array.isArray(ingredienti) || ingredienti.length === 0) {
+            return res.status(400).json({ error: "Formato non valido" });
+        }
+
+        const data_aggiornamento = new Date().toISOString().split('T')[0];
+        const inserts = ingredienti.map(i => {
+            const prezzo = parseFloat(i.prezzo_attuale);
+            const scarto = parseFloat(i.scarto);
+            return {
+                user_id: userId,
+                nome: i.nome || 'Sconosciuto',
+                unita: i.unita || 'pz',
+                prezzo_attuale: isNaN(prezzo) || prezzo < 0 ? 0 : prezzo,
+                scarto: isNaN(scarto) || scarto < 0 || scarto > 99 ? 0 : scarto,
+                data_aggiornamento
+            };
+        });
+
+        const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
+        if (error) return res.status(500).json({ error: 'Errore database', details: error.message });
+        
+        res.json({ count: data?.length || 0 });
+    } catch (err) {
+        console.error('[BATCH CRASH]', err.message);
+        res.status(500).json({ error: 'Errore importazione', details: err.message });
+    }
 });
 
 app.use('/api/', apiLimiter);
