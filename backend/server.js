@@ -140,16 +140,28 @@ app.post('/api/ingredienti/batch', async (req, res) => {
             };
         });
 
-        const dbRes = await fetch(`${rawUrl}/rest/v1/ingredienti`, {
-            method: 'POST',
-            headers: {
-                'apikey': rawKey,
-                'Authorization': `Bearer ${rawKey}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-            },
-            body: JSON.stringify(inserts)
-        });
+        // Assicurati che l'URL sia pulito (spessi problemi in incolla su Railway)
+        let cleanUrl = rawUrl.replace(/^["'=]+|["']+$/g, '').replace(/\/$/, "");
+        
+        // Log preparatorio (se muore qui, non vediamo questo log)
+        console.log(`[BATCH PROVA] Invio a: ${cleanUrl}/rest/v1/ingredienti`);
+        
+        let dbRes;
+        try {
+            dbRes = await fetch(`${cleanUrl}/rest/v1/ingredienti`, {
+                method: 'POST',
+                headers: {
+                    'apikey': rawKey,
+                    'Authorization': `Bearer ${rawKey}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(inserts)
+            });
+        } catch (fetchErr) {
+            console.error('[BATCH RAW FETCH CRASH]', fetchErr.message);
+            return res.status(500).json({ error: 'Crash Fetch Interno', details: fetchErr.toString() });
+        }
 
         if (!dbRes.ok) {
             const errBody = await dbRes.text();
