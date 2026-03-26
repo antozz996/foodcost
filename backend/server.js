@@ -116,53 +116,58 @@ app.post('/bulk-ping', (req, res) => {
 });
 
 app.post('/bulk-ingredients-root', async (req, res) => {
-    console.log("[ENDPOINT HIT] /bulk-ingredients-root");
-    try {
-        const { ingredienti } = req.body;
-        const userId = req.user?.id || 'TEST_USER_ID'; 
-        
-        if (!ingredienti || !Array.isArray(ingredienti)) return res.status(400).json({ error: "Formato non valido" });
-
-        const data_aggiornamento = new Date().toISOString().split('T')[0];
-        const inserts = ingredienti.map(i => {
-            const prezzo = parseFloat(i.prezzo_attuale);
-            const scarto = parseFloat(i.scarto);
-            return {
-                user_id: userId,
-                nome: i.nome || 'Sconosciuto',
-                unita: i.unita || 'pz',
-                prezzo_attuale: isNaN(prezzo) || prezzo < 0 ? 0 : prezzo,
-                scarto: isNaN(scarto) || scarto < 0 || scarto > 99 ? 0 : scarto,
-                data_aggiornamento
-            };
-        });
-
-        console.log(`[BATCH IMPORT] Processing ${inserts.length} items`);
-        console.log(`[BATCH IMPORT] Dati prepared:`, JSON.stringify(inserts));
-
-        // Safety timeout per evitare 503 se Supabase si blocca
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Timeout database (10s)")), 10000)
-        );
-
-        const { data, error } = await Promise.race([
-            supabase.from('ingredienti').insert(inserts).select(),
-            timeoutPromise
-        ]);
-        
-        if (error) {
-            console.error('[BATCH IMPORT ERROR] Supabase error:', error);
-            throw error;
+    console.log("[ENDPOINT HIT] /bulk-ingredients-root - Manual parsing START");
+    
+    let rawBody = '';
+    req.on('data', chunk => {
+        rawBody += chunk.toString();
+        if (rawBody.length > 10 * 1024 * 1024) { // 10MB limit
+            console.error("[BULK ERROR] Body too large");
         }
-        console.log(`[BATCH IMPORT] Successo. Righe inserite: ${data?.length || 0}`);
-        res.json({ count: data?.length || 0 });
-    } catch (err) {
-        console.error('[API ERROR] POST /api/ingredienti/batch:', err.message);
-        res.status(500).json({ 
-            error: "Errore durante il salvataggio nel database", 
-            details: err.message 
-        });
-    }
+    });
+
+    req.on('end', async () => {
+        console.log("[BULK DEBUG] Stream END. Parsing JSON...");
+        try {
+            const body = JSON.parse(rawBody);
+            const { ingredienti } = body;
+            const userId = 'TEST_USER_ID'; 
+            
+            if (!ingredienti || !Array.isArray(ingredienti)) {
+                return res.status(400).json({ error: "Formato non valido" });
+            }
+
+            const data_aggiornamento = new Date().toISOString().split('T')[0];
+            const inserts = ingredienti.map(i => {
+                const prezzo = parseFloat(i.prezzo_attuale);
+                return {
+                    user_id: userId,
+                    nome: i.nome || 'Sconosciuto',
+                    unita: i.unita || 'pz',
+                    prezzo_attuale: isNaN(prezzo) || prezzo < 0 ? 0 : prezzo,
+                    scarto: parseFloat(i.scarto) || 0,
+                    data_aggiornamento
+                };
+            });
+
+            console.log(`[BATCH IMPORT] Inserting ${inserts.length} items`);
+            const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
+            
+            if (error) {
+                console.error('[BATCH IMPORT ERROR] Supabase error:', error);
+                return res.status(500).json({ error: error.message });
+            }
+            res.json({ count: data?.length || 0 });
+        } catch (err) {
+            console.error('[BULK CRASH] Manual Parse Fail:', err.message);
+            res.status(500).json({ error: "Errore durante il parsing manuale", details: err.message });
+        }
+    });
+
+    req.on('error', (err) => {
+        console.error('[BULK STREAM ERROR]', err);
+        res.status(500).json({ error: 'Stream error' });
+    });
 });
 
 app.put('/api/ingredienti/:id', authMiddleware, async (req, res) => {
