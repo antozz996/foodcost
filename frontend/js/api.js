@@ -60,7 +60,8 @@ export const api = {
         if (!res.ok) {
             let errorData;
             try { errorData = await res.json(); } catch(e) {}
-            const msg = errorData?.details || errorData?.error || res.statusText || 'ERRORE_DEBUG_V3';
+            const bodyStr = errorData ? JSON.stringify(errorData) : 'NoJSON';
+            const msg = `[Status ${res.status}] ${res.statusText || 'NoText'} | Body: ${bodyStr}`;
             throw new Error(msg);
         }
         return res.json();
