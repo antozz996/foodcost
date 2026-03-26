@@ -149,6 +149,7 @@ export async function renderIngredients(container) {
             }
 
             if (parsedIngredients.length > 0) {
+                console.log('[IMPORT DEBUG] Inviando ingredienti:', parsedIngredients);
                 btnImportHover.textContent = 'Importazione in corso...';
                 try {
                     await api.post('/ingredienti/batch', { ingredienti: parsedIngredients });

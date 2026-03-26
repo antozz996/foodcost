@@ -51,13 +51,18 @@ export const api = {
         }
     },
     post: async (endpoint, data) => {
-        api.invalidate(endpoint.split('/')[2]); // Invalida cache per il modulo (es: ingredienti)
+        api.invalidate(endpoint.split('/')[2]);
         const res = await fetch(`${API_URL}${endpoint}`, {
             method: 'POST',
             headers: await getHeaders(),
             body: JSON.stringify(data)
         });
-        if (!res.ok) throw new Error('API Error');
+        if (!res.ok) {
+            let errorData;
+            try { errorData = await res.json(); } catch(e) {}
+            const msg = errorData?.details || errorData?.error || res.statusText || 'API Error';
+            throw new Error(msg);
+        }
         return res.json();
     },
     put: async (endpoint, data) => {
@@ -67,7 +72,12 @@ export const api = {
             headers: await getHeaders(),
             body: JSON.stringify(data)
         });
-        if (!res.ok) throw new Error('API Error');
+        if (!res.ok) {
+            let errorData;
+            try { errorData = await res.json(); } catch(e) {}
+            const msg = errorData?.details || errorData?.error || res.statusText || 'API Error';
+            throw new Error(msg);
+        }
         return res.json();
     },
     delete: async (endpoint) => {
@@ -76,7 +86,12 @@ export const api = {
             method: 'DELETE',
             headers: await getHeaders()
         });
-        if (!res.ok) throw new Error('API Error');
+        if (!res.ok) {
+            let errorData;
+            try { errorData = await res.json(); } catch(e) {}
+            const msg = errorData?.details || errorData?.error || res.statusText || 'API Error';
+            throw new Error(msg);
+        }
         return res.json();
     },
     invalidate: (key) => {
