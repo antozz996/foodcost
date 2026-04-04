@@ -106,32 +106,19 @@ app.post('/api/debug-outbound-post', async (req, res) => {
     }
 });
 
-app.post('/api/ingredienti/batch', async (req, res) => {
+app.post('/api/ingredienti/batch', authMiddleware, apiLimiter, async (req, res) => {
     try {
-        const token = req.headers.authorization?.split(' ')[1];
-        if (!token) return res.status(401).json({ error: 'Token mancante' });
-
-        const authResult = await supabase.auth.getUser(token);
-        if (authResult.error || !authResult.data?.user) {
-            return res.status(401).json({ error: 'Token non valido' });
-        }
-        const userId = authResult.data.user.id;
-
         const { ingredienti } = req.body;
         if (!ingredienti || !Array.isArray(ingredienti) || ingredienti.length === 0) {
             return res.status(400).json({ error: "Formato non valido" });
         }
 
-        // Raw HTTP insert to bypass the Supabase client library
-        const rawUrl = (process.env.SUPABASE_URL || '').trim();
-        const rawKey = (process.env.SUPABASE_SERVICE_KEY || '').trim();
         const data_aggiornamento = new Date().toISOString().split('T')[0];
-        
         const inserts = ingredienti.map(i => {
             const prezzo = parseFloat(i.prezzo_attuale);
             const scarto = parseFloat(i.scarto);
             return {
-                user_id: userId,
+                user_id: req.user.id,
                 nome: i.nome || 'Sconosciuto',
                 unita: i.unita || 'pz',
                 prezzo_attuale: isNaN(prezzo) || prezzo < 0 ? 0 : prezzo,
@@ -140,38 +127,19 @@ app.post('/api/ingredienti/batch', async (req, res) => {
             };
         });
 
-        const { execFile } = require('child_process');
-        const path = require('path');
-        const workerPath = path.join(__dirname, 'insert_worker.js');
+        // High-performance single database transaction for the entire batch
+        const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
         
-        console.log('[BATCH] Spawning isolated worker per insert...');
-        
-        execFile('node', [workerPath, JSON.stringify(inserts)], { timeout: 10000 }, (error, stdout, stderr) => {
-            if (error) {
-                console.error('[BATCH WORKER CRASH]', error);
-                return res.status(500).json({ 
-                    error: 'Worker Crash', 
-                    signal: error.signal, 
-                    code: error.code, 
-                    message: error.message,
-                    stderr: stderr 
-                });
-            }
-            
-            try {
-                const result = JSON.parse(stdout);
-                if (!result.success) {
-                    return res.status(500).json({ error: 'DB Error da Worker', details: result.error, stack: result.stack });
-                }
-                res.json({ count: result.dbRes?.data?.length || inserts.length, worker: true });
-            } catch(e) {
-                res.status(500).json({ error: 'Errore parsing worker stdout', stdout });
-            }
-        });
+        if (error) {
+            console.error('[BATCH INSERT ERROR]', error.message);
+            return res.status(500).json({ error: "Errore inserimento database", details: error.message });
+        }
+
+        res.json({ count: data?.length || 0 });
 
     } catch (err) {
         console.error('[BATCH CRASH]', err.message, err.stack);
-        res.status(500).json({ error: 'Crash', details: err.message });
+        res.status(500).json({ error: 'Crash generale batch', details: err.message });
     }
 });
 
