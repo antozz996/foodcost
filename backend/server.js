@@ -131,7 +131,14 @@ app.post('/api/ingredienti/batch', authMiddleware, apiLimiter, async (req, res) 
         const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
         
         if (error) {
-            console.error('[BATCH INSERT ERROR]', error.message);
+            console.error('[BATCH INSERT ERROR]', error.code, error.message);
+            // Detect schema mismatch/missing column (PostgREST code 42703 or general column error)
+            if (error.code === '42703' || error.message?.includes('column') || error.message?.includes('schema cache')) {
+                return res.status(400).json({ 
+                    error: "Errore Schema Database", 
+                    details: "La colonna 'scarto' o 'prezzo_attuale' non è riconosciuta. Esegui il SQL di riparazione in Supabase per risolvere."
+                });
+            }
             return res.status(500).json({ error: "Errore inserimento database", details: error.message });
         }
 
@@ -165,7 +172,15 @@ app.post('/api/ingredienti', authMiddleware, async (req, res) => {
             { user_id: req.user.id, nome, unita, prezzo_attuale, scarto: scarto || 0, data_aggiornamento }
         ]).select();
         
-        if (error) throw error;
+        if (error) {
+            if (error.code === '42703' || error.message?.includes('column') || error.message?.includes('schema cache')) {
+                return res.status(400).json({ 
+                    error: "Errore Schema Database", 
+                    details: "Colonna mancante o cache scaduta su Supabase. Controlla il SQL Editor."
+                });
+            }
+            throw error;
+        }
         if (!data || data.length === 0) throw new Error("Errore durante l'inserimento dell'ingrediente.");
         
         res.json({ id: data[0].id });
