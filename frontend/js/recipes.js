@@ -105,38 +105,45 @@ export async function renderRecipes(container) {
         });
     };
 
+    let selectedIngredient = null;
     document.getElementById('ingredient-search').addEventListener('input', (e) => {
-        const selectedValue = e.target.value;
-        const option = Array.from(document.querySelectorAll('#ingredients-datalist option')).find(opt => opt.value === selectedValue);
+        const val = e.target.value.toLowerCase();
+        const options = Array.from(document.querySelectorAll('#ingredients-datalist option'));
+        const option = options.find(opt => opt.value.toLowerCase() === val || opt.value.toLowerCase().startsWith(val + ' ('));
+        
         if (option) {
-            document.getElementById('ingredient-unit-label').textContent = option.dataset.unit;
+            selectedIngredient = {
+                id: option.dataset.id,
+                nome: option.value.split(' (')[0],
+                unita: option.dataset.unit
+            };
+            document.getElementById('ingredient-unit-label').textContent = selectedIngredient.unita;
         } else {
+            selectedIngredient = null;
             document.getElementById('ingredient-unit-label').textContent = '';
         }
     });
 
     document.getElementById('btn-add-ingredient-to-list').addEventListener('click', () => {
-        const searchInput = document.getElementById('ingredient-search');
         const qtyInput = document.getElementById('ingredient-qty');
-        
-        const selectedValue = searchInput.value;
-        const option = Array.from(document.querySelectorAll('#ingredients-datalist option')).find(opt => opt.value === selectedValue);
-        
-        if (!option) {
+        const quantita = parseFloat(qtyInput.value);
+
+        if (!selectedIngredient) {
             alert('Seleziona un ingrediente valido dalla lista!');
             return;
         }
 
-        const id = option.dataset.id;
-        const nome = selectedValue.split(' (')[0];
-        const unita = option.dataset.unit;
-        const quantita = parseFloat(qtyInput.value);
-
-        if (id && quantita > 0) {
-            currentIngredients.push({ ingrediente_id: id, nome, unita, quantita });
-            searchInput.value = '';
+        if (quantita > 0) {
+            currentIngredients.push({ 
+                ingrediente_id: selectedIngredient.id, 
+                nome: selectedIngredient.nome, 
+                unita: selectedIngredient.unita, 
+                quantita 
+            });
+            document.getElementById('ingredient-search').value = '';
             qtyInput.value = '';
             document.getElementById('ingredient-unit-label').textContent = '';
+            selectedIngredient = null;
             updateIngredientsList();
         } else {
             alert('Inserisci una quantità valida (maggiore di zero).');

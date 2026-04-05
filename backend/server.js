@@ -439,8 +439,9 @@ app.post('/api/menu', authMiddleware, async (req, res) => {
         }
         res.json({ id: menu_id });
     } catch (err) {
-        console.error('[API ERROR] POST /api/menu:', err.message);
-        res.status(500).json({ error: err.message });
+        console.error('[API ERROR] POST /api/menu:', err.message, err.stack);
+        if (err.details) console.error('[SB ERROR DETAILS]', err.details);
+        res.status(500).json({ error: err.message, details: err.details });
     }
 });
 
