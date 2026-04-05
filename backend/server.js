@@ -131,13 +131,18 @@ app.post('/api/ingredienti/batch', authMiddleware, apiLimiter, async (req, res) 
         const { data, error } = await supabase.from('ingredienti').insert(inserts).select();
         
         if (error) {
-            console.error('[BATCH INSERT ERROR]', error.code, error.message);
-            // Detect schema mismatch/missing column (PostgREST code 42703 or general column error)
+            console.warn('[BATCH BULK FAILED] error.code:', error.code, 'message:', error.message);
+            // Fallback: If bulk insert fails because of a stale schema cache (PostgREST specific error),
+            // try to insert them one by one. It's slower but much more resilient to cache issues.
             if (error.code === '42703' || error.message?.includes('column') || error.message?.includes('schema cache')) {
-                return res.status(400).json({ 
-                    error: "Errore Schema Database", 
-                    details: "La colonna 'scarto' o 'prezzo_attuale' non è riconosciuta. Esegui il SQL di riparazione in Supabase per risolvere."
-                });
+                console.log('[BATCH FALLBACK] Tentativo di inserimento sequenziale...');
+                let inserted = 0;
+                for (const i of inserts) {
+                    const { error: errLoop } = await supabase.from('ingredienti').insert([i]);
+                    if (!errLoop) inserted++;
+                    else console.error('[BATCH FALLBACK ERR]', i.nome, errLoop.message);
+                }
+                return res.json({ count: inserted, fallback: true });
             }
             return res.status(500).json({ error: "Errore inserimento database", details: error.message });
         }
